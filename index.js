@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 const fs = require('fs');
 const path = require('path');
 const FormData = require('form-data');
@@ -179,10 +179,16 @@ async function monitor() {
   let seenListings = loadSeenListings();
   console.log(`[INFO] Loaded ${seenListings.size} previously seen listings`);
 
+  // Determine Chrome executable path
+  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH ||
+    (process.platform === 'win32' ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' : '/usr/bin/chromium');
+
+  console.log(`[INFO] Using browser at: ${executablePath}`);
+
   // Launch browser with cloud-compatible settings
   const browser = await puppeteer.launch({
     headless: 'new',
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    executablePath: executablePath,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -191,7 +197,9 @@ async function monitor() {
       '--no-first-run',
       '--no-zygote',
       '--single-process',
-      '--disable-gpu'
+      '--disable-gpu',
+      '--disable-software-rasterizer',
+      '--disable-extensions'
     ]
   });
 
