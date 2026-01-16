@@ -16,6 +16,9 @@ const EMAIL_USER = process.env.EMAIL_USER;           // Your Gmail address
 const EMAIL_PASS = process.env.EMAIL_PASS;           // Gmail app password
 const EMAIL_TO = process.env.EMAIL_TO || EMAIL_USER; // Recipient (defaults to sender)
 
+// Test mode
+const SEND_TEST = process.env.SEND_TEST === 'true';
+
 // eBay search URL sorted by newly listed (_sop=10)
 const EBAY_SEARCH_URL = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(SEARCH_QUERY)}&_sop=10`;
 
@@ -261,6 +264,19 @@ async function monitor() {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 800 });
   await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
+  // Send test notification if SEND_TEST=true
+  if (SEND_TEST) {
+    console.log('[TEST] Sending test notification...');
+    const testListing = {
+      id: 'test-123',
+      title: 'TEST: eBay Monitor is Working!',
+      url: 'https://www.ebay.com',
+      price: '$99.99'
+    };
+    await sendDiscordNotification(testListing, Buffer.from([]));
+    console.log('[TEST] Test notification sent! Remove SEND_TEST env var to disable.');
+  }
 
   let isFirstRun = seenListings.size === 0;
 
