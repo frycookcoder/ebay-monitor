@@ -1,43 +1,17 @@
-# Use Node.js LTS with Debian for better Chromium compatibility
-FROM node:20-slim
+# Use official Puppeteer image with Chrome pre-installed
+FROM ghcr.io/puppeteer/puppeteer:22.0.0
 
-# Install dependencies for Puppeteer/Chromium
-RUN apt-get update && apt-get install -y \
-    chromium \
-    fonts-ipafont-gothic \
-    fonts-wqy-zenhei \
-    fonts-thai-tlwg \
-    fonts-kacst \
-    fonts-freefont-ttf \
-    fonts-liberation \
-    libxss1 \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set Puppeteer to skip downloading Chrome (we use system Chromium)
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-
-# Create app directory
+# Set working directory
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY --chown=pptruser:pptruser package*.json ./
 
 # Install dependencies
 RUN npm ci --omit=dev
 
 # Copy application code
-COPY . .
-
-# Create directory for seen listings persistence
-RUN mkdir -p /app/data
-
-# Run as non-root user for security
-RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
-    && chown -R pptruser:pptruser /app
-
-USER pptruser
+COPY --chown=pptruser:pptruser . .
 
 # Start the application
 CMD ["npm", "start"]
