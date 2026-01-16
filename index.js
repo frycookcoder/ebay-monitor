@@ -3,12 +3,18 @@ const fs = require('fs');
 const path = require('path');
 const FormData = require('form-data');
 const fetch = require('node-fetch');
+const nodemailer = require('nodemailer');
 
 // Configuration
 const SEARCH_QUERY = 'Spongebob Topps Sketch';
 const CHECK_INTERVAL_MS = 7 * 60 * 1000; // 7 minutes
 const SEEN_LISTINGS_FILE = path.join(__dirname, 'seen_listings.json');
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
+
+// Email configuration
+const EMAIL_USER = process.env.EMAIL_USER;           // Your Gmail address
+const EMAIL_PASS = process.env.EMAIL_PASS;           // Gmail app password
+const EMAIL_TO = process.env.EMAIL_TO || EMAIL_USER; // Recipient (defaults to sender)
 
 // eBay search URL sorted by newly listed (_sop=10)
 const EBAY_SEARCH_URL = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(SEARCH_QUERY)}&_sop=10`;
@@ -93,6 +99,57 @@ async function sendDiscordNotification(listing, screenshotBuffer) {
   }
 }
 
+// Send email notification
+async function sendEmailNotification(listing, screenshotBuffer) {
+  if (!EMAIL_USER || !EMAIL_PASS) {
+    return; // Silently skip if email not configured
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: EMAIL_USER,
+        pass: EMAIL_PASS
+      }
+    });
+
+    const mailOptions = {
+      from: EMAIL_USER,
+      to: EMAIL_TO,
+      subject: `New eBay Listing: ${listing.title}`,
+      html: `
+        <h2>New eBay Listing Found!</h2>
+        <p><strong>Title:</strong> ${listing.title}</p>
+        <p><strong>Price:</strong> ${listing.price || 'Price not available'}</p>
+        <p><strong>Link:</strong> <a href="${listing.url}">${listing.url}</a></p>
+        <br>
+        <p style="color: #666; font-size: 12px;">Sent by eBay Listing Monitor</p>
+      `,
+      attachments: screenshotBuffer && screenshotBuffer.length > 0 ? [
+        {
+          filename: 'listing.png',
+          content: screenshotBuffer,
+          cid: 'listing'
+        }
+      ] : []
+    };
+
+    // Add inline image if screenshot exists
+    if (screenshotBuffer && screenshotBuffer.length > 0) {
+      mailOptions.html = mailOptions.html.replace(
+        '</h2>',
+        '</h2><img src="cid:listing" style="max-width: 100%; margin: 10px 0;" />'
+      );
+    }
+
+    await transporter.sendMail(mailOptions);
+    console.log(`[SUCCESS] Email notification sent for: ${listing.title}`);
+  } catch (error) {
+    console.error('[ERROR] Failed to send email notification:', error.message);
+  }
+}
+
 // Take screenshot of a listing
 async function takeListingScreenshot(browser, url) {
   const page = await browser.newPage();
@@ -173,7 +230,13 @@ async function monitor() {
   console.log(`[INFO] Check interval: ${CHECK_INTERVAL_MS / 1000 / 60} minutes`);
 
   if (!DISCORD_WEBHOOK_URL) {
-    console.warn('[WARN] DISCORD_WEBHOOK_URL not set - notifications will be disabled');
+    console.warn('[WARN] DISCORD_WEBHOOK_URL not set - Discord notifications disabled');
+  }
+
+  if (!EMAIL_USER || !EMAIL_PASS) {
+    console.warn('[WARN] EMAIL_USER/EMAIL_PASS not set - Email notifications disabled');
+  } else {
+    console.log(`[INFO] Email notifications will be sent to: ${EMAIL_TO}`);
   }
 
   let seenListings = loadSeenListings();
@@ -226,14 +289,15 @@ async function monitor() {
             console.log(`[NEW] New listing found: ${listing.title} - ${listing.price}`);
             console.log(`[NEW] URL: ${listing.url}`);
 
-            // Take screenshot and send notification
+            // Take screenshot and send notifications
             const screenshot = await takeListingScreenshot(browser, listing.url);
-            if (screenshot) {
-              await sendDiscordNotification(listing, screenshot);
-            } else {
-              // Send notification without screenshot
-              await sendDiscordNotification(listing, Buffer.from([]));
-            }
+            const screenshotBuffer = screenshot || Buffer.from([]);
+
+            // Send both Discord and email notifications
+            await Promise.all([
+              sendDiscordNotification(listing, screenshotBuffer),
+              sendEmailNotification(listing, screenshotBuffer)
+            ]);
           }
         }
       }
