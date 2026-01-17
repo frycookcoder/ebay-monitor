@@ -1,21 +1,47 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const fs = require('fs');
+const path = require('path');
 
 // Use stealth plugin to avoid detection
 puppeteer.use(StealthPlugin());
 
-// Configuration
+// Global Configuration
 const CONFIG = {
-  searchQuery: process.env.SEARCH_QUERY || 'Spongebob Topps Sketch',
-  checkIntervalMinutes: parseInt(process.env.CHECK_INTERVAL) || 5,
-  discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL,
-  dataFile: process.env.DATA_FILE || './seen_listings.json',
-  // Production stability settings
+  checkIntervalMinutes: parseInt(process.env.CHECK_INTERVAL) || 10,
   browserRestartHours: parseFloat(process.env.BROWSER_RESTART_HOURS) || 2,
   maxRetries: parseInt(process.env.MAX_RETRIES) || 3,
   healthCheckHours: parseFloat(process.env.HEALTH_CHECK_HOURS) || 6,
 };
+
+// Multi-search configuration
+// Each search has its own query, Discord webhook, and data file
+const SEARCH_CONFIGS = [
+  {
+    name: 'Sketch',
+    searchQuery: 'Spongebob Topps Sketch',
+    webhookUrl: process.env.DISCORD_WEBHOOK_SKETCH,
+    dataFile: path.join(__dirname, 'seen_listings_sketch.json')
+  },
+  {
+    name: 'Superfractor',
+    searchQuery: 'Spongebob Topps Superfractor',
+    webhookUrl: process.env.DISCORD_WEBHOOK_SUPERFRACTOR,
+    dataFile: path.join(__dirname, 'seen_listings_superfractor.json')
+  },
+  {
+    name: '1/1',
+    searchQuery: 'Spongebob Topps 1/1',
+    webhookUrl: process.env.DISCORD_WEBHOOK_1OF1,
+    dataFile: path.join(__dirname, 'seen_listings_1of1.json')
+  },
+  {
+    name: '/5',
+    searchQuery: 'Spongebob Topps /5',
+    webhookUrl: process.env.DISCORD_WEBHOOK_5,
+    dataFile: path.join(__dirname, 'seen_listings_5.json')
+  }
+];
 
 // State
 let browser = null;
@@ -26,6 +52,9 @@ let totalChecks = 0;
 let totalNewListings = 0;
 let consecutiveFailures = 0;
 
+// State per search
+const searchStates = new Map();
+
 // Build eBay search URL (sorted by newly listed)
 function buildEbayUrl(query) {
   const encodedQuery = encodeURIComponent(query);
@@ -33,10 +62,10 @@ function buildEbayUrl(query) {
 }
 
 // Load seen listings from file
-function loadSeenListings() {
+function loadSeenListings(dataFile) {
   try {
-    if (fs.existsSync(CONFIG.dataFile)) {
-      const data = fs.readFileSync(CONFIG.dataFile, 'utf8');
+    if (fs.existsSync(dataFile)) {
+      const data = fs.readFileSync(dataFile, 'utf8');
       return new Set(JSON.parse(data));
     }
   } catch (error) {
@@ -46,9 +75,9 @@ function loadSeenListings() {
 }
 
 // Save seen listings to file
-function saveSeenListings(seenSet) {
+function saveSeenListings(dataFile, seenSet) {
   try {
-    fs.writeFileSync(CONFIG.dataFile, JSON.stringify([...seenSet]), 'utf8');
+    fs.writeFileSync(dataFile, JSON.stringify([...seenSet]), 'utf8');
   } catch (error) {
     console.error('[ERROR] Failed to save seen listings:', error.message);
   }
@@ -57,14 +86,13 @@ function saveSeenListings(seenSet) {
 // Format price for display
 function formatPrice(priceText) {
   if (!priceText || priceText === 'N/A') return 'Price not listed';
-  // Clean up the price text
   return priceText.replace(/\s+/g, ' ').trim();
 }
 
 // Send Discord notification for new listing
-async function sendListingNotification(listing) {
-  if (!CONFIG.discordWebhookUrl) {
-    console.log('[WARN] No Discord webhook URL configured');
+async function sendListingNotification(listing, searchConfig) {
+  if (!searchConfig.webhookUrl) {
+    console.log(`[WARN] No Discord webhook URL configured for ${searchConfig.name}`);
     return false;
   }
 
@@ -86,7 +114,7 @@ async function sendListingNotification(listing) {
     ],
     timestamp: new Date().toISOString(),
     footer: {
-      text: `eBay Monitor • ${CONFIG.searchQuery}`
+      text: `eBay Monitor • ${searchConfig.name}`
     }
   };
 
@@ -102,7 +130,7 @@ async function sendListingNotification(listing) {
   };
 
   try {
-    const response = await fetch(CONFIG.discordWebhookUrl, {
+    const response = await fetch(searchConfig.webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -114,23 +142,27 @@ async function sendListingNotification(listing) {
 
     return true;
   } catch (error) {
-    console.error('[ERROR] Failed to send Discord notification:', error.message);
+    console.error(`[ERROR] Failed to send Discord notification for ${searchConfig.name}:`, error.message);
     return false;
   }
 }
 
-// Send startup notification
+// Send startup notification (to first configured webhook)
 async function sendStartupNotification() {
-  if (!CONFIG.discordWebhookUrl) return;
+  const firstWebhook = SEARCH_CONFIGS.find(c => c.webhookUrl)?.webhookUrl;
+  if (!firstWebhook) return;
+
+  const searchList = SEARCH_CONFIGS.map(c => `• ${c.name}: "${c.searchQuery}"`).join('\n');
 
   const embed = {
     title: '🚀 eBay Monitor Started',
     color: 0x0099FF, // Blue
+    description: `Monitoring ${SEARCH_CONFIGS.length} searches`,
     fields: [
       {
-        name: '🔍 Search Query',
-        value: CONFIG.searchQuery,
-        inline: true
+        name: '🔍 Searches',
+        value: searchList,
+        inline: false
       },
       {
         name: '⏱️ Check Interval',
@@ -156,7 +188,7 @@ async function sendStartupNotification() {
   };
 
   try {
-    await fetch(CONFIG.discordWebhookUrl, {
+    await fetch(firstWebhook, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -169,7 +201,8 @@ async function sendStartupNotification() {
 
 // Send health check notification
 async function sendHealthCheckNotification() {
-  if (!CONFIG.discordWebhookUrl) return;
+  const firstWebhook = SEARCH_CONFIGS.find(c => c.webhookUrl)?.webhookUrl;
+  if (!firstWebhook) return;
 
   const uptimeHours = browserStartTime ? ((Date.now() - browserStartTime) / 1000 / 60 / 60).toFixed(1) : '0';
   const lastCheckAgo = lastSuccessfulCheck ? Math.round((Date.now() - lastSuccessfulCheck) / 1000 / 60) : 'N/A';
@@ -197,6 +230,11 @@ async function sendHealthCheckNotification() {
         name: '⏱️ Last Check',
         value: lastCheckAgo === 'N/A' ? 'N/A' : `${lastCheckAgo} min ago`,
         inline: true
+      },
+      {
+        name: '🔍 Active Searches',
+        value: `${SEARCH_CONFIGS.length}`,
+        inline: true
       }
     ],
     timestamp: new Date().toISOString(),
@@ -212,7 +250,7 @@ async function sendHealthCheckNotification() {
   };
 
   try {
-    await fetch(CONFIG.discordWebhookUrl, {
+    await fetch(firstWebhook, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -225,7 +263,8 @@ async function sendHealthCheckNotification() {
 
 // Send error notification
 async function sendErrorNotification(errorMessage) {
-  if (!CONFIG.discordWebhookUrl) return;
+  const firstWebhook = SEARCH_CONFIGS.find(c => c.webhookUrl)?.webhookUrl;
+  if (!firstWebhook) return;
 
   const embed = {
     title: '⚠️ Monitor Error',
@@ -256,7 +295,7 @@ async function sendErrorNotification(errorMessage) {
   };
 
   try {
-    await fetch(CONFIG.discordWebhookUrl, {
+    await fetch(firstWebhook, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -320,8 +359,8 @@ function shouldRestartBrowser() {
 }
 
 // Scrape listings from eBay page with retry logic
-async function scrapeListings(retryCount = 0) {
-  const url = buildEbayUrl(CONFIG.searchQuery);
+async function scrapeListings(searchQuery, retryCount = 0) {
+  const url = buildEbayUrl(searchQuery);
 
   try {
     // Check if browser needs restart
@@ -338,7 +377,7 @@ async function scrapeListings(retryCount = 0) {
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
     }
 
-    console.log(`[INFO] Navigating to eBay...`);
+    console.log(`[INFO] Navigating to eBay for: "${searchQuery}"`);
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
     // Wait for search results to load
@@ -416,7 +455,7 @@ async function scrapeListings(retryCount = 0) {
 
       // Restart browser on retry
       await launchBrowser();
-      return scrapeListings(retryCount + 1);
+      return scrapeListings(searchQuery, retryCount + 1);
     }
 
     // Send error notification after max retries
@@ -428,37 +467,37 @@ async function scrapeListings(retryCount = 0) {
   }
 }
 
-// Main check function
-async function checkForNewListings(seenListings, isFirstRun) {
-  const timestamp = new Date().toLocaleString();
-  console.log(`\n[${timestamp}] Running check #${totalChecks + 1}...`);
+// Check a single search for new listings
+async function checkSearch(searchConfig) {
+  const state = searchStates.get(searchConfig.name);
+
+  console.log(`[INFO] Checking: "${searchConfig.searchQuery}"`);
 
   try {
-    const listings = await scrapeListings();
-    totalChecks++;
+    const listings = await scrapeListings(searchConfig.searchQuery);
 
     if (listings.length === 0) {
-      console.log('[WARN] No listings found');
-      return { seenListings, isFirstRun, newCount: 0 };
+      console.log(`[WARN] [${searchConfig.name}] No listings found`);
+      return 0;
     }
 
-    console.log(`[INFO] Found ${listings.length} listings on page`);
+    console.log(`[INFO] [${searchConfig.name}] Found ${listings.length} listings on page`);
     let newCount = 0;
 
     for (const listing of listings) {
-      if (!seenListings.has(listing.id)) {
-        seenListings.add(listing.id);
+      if (!state.seenListings.has(listing.id)) {
+        state.seenListings.add(listing.id);
         newCount++;
 
-        if (isFirstRun) {
-          console.log(`[INIT] ${listing.title?.substring(0, 50)}...`);
+        if (state.isFirstRun) {
+          console.log(`[INIT] [${searchConfig.name}] ${listing.title?.substring(0, 50)}...`);
         } else {
-          console.log(`[NEW] ${listing.title?.substring(0, 60)}...`);
+          console.log(`[NEW] [${searchConfig.name}] ${listing.title?.substring(0, 60)}...`);
           console.log(`      Price: ${listing.price}`);
           console.log(`      URL: ${listing.url}`);
 
           // Send Discord notification
-          await sendListingNotification(listing);
+          await sendListingNotification(listing, searchConfig);
           totalNewListings++;
 
           // Rate limit: wait between notifications
@@ -467,56 +506,88 @@ async function checkForNewListings(seenListings, isFirstRun) {
       }
     }
 
-    if (isFirstRun) {
-      console.log(`[INFO] Initial scan complete - marked ${newCount} existing listings`);
-      isFirstRun = false;
+    if (state.isFirstRun) {
+      console.log(`[INFO] [${searchConfig.name}] Initial scan complete - marked ${newCount} existing listings`);
+      state.isFirstRun = false;
     } else if (newCount === 0) {
-      console.log('[INFO] No new listings');
+      console.log(`[INFO] [${searchConfig.name}] No new listings`);
     } else {
-      console.log(`[INFO] Found ${newCount} new listing(s)!`);
+      console.log(`[INFO] [${searchConfig.name}] Found ${newCount} new listing(s)!`);
     }
 
     // Save state
-    saveSeenListings(seenListings);
-    lastSuccessfulCheck = Date.now();
+    saveSeenListings(searchConfig.dataFile, state.seenListings);
 
     // Prune old listings (keep last 2000)
-    if (seenListings.size > 2000) {
-      const arr = [...seenListings];
-      seenListings = new Set(arr.slice(-2000));
-      saveSeenListings(seenListings);
-      console.log('[INFO] Pruned old listings');
+    if (state.seenListings.size > 2000) {
+      const arr = [...state.seenListings];
+      state.seenListings = new Set(arr.slice(-2000));
+      saveSeenListings(searchConfig.dataFile, state.seenListings);
+      console.log(`[INFO] [${searchConfig.name}] Pruned old listings`);
     }
 
-    return { seenListings, isFirstRun, newCount };
+    return newCount;
 
   } catch (error) {
-    console.error('[ERROR] Check failed:', error.message);
-    return { seenListings, isFirstRun, newCount: 0 };
+    console.error(`[ERROR] [${searchConfig.name}] Check failed:`, error.message);
+    return 0;
   }
+}
+
+// Check all searches
+async function checkAllSearches() {
+  const timestamp = new Date().toLocaleString();
+  console.log(`\n[${timestamp}] Running check #${totalChecks + 1} for all ${SEARCH_CONFIGS.length} searches...`);
+
+  let totalNew = 0;
+
+  for (const searchConfig of SEARCH_CONFIGS) {
+    const newCount = await checkSearch(searchConfig);
+    totalNew += newCount;
+
+    // Small delay between searches to be respectful to eBay
+    await new Promise(resolve => setTimeout(resolve, 3000));
+  }
+
+  totalChecks++;
+  lastSuccessfulCheck = Date.now();
+
+  console.log(`[INFO] All searches completed. Total new listings: ${totalNew}`);
+  return totalNew;
 }
 
 // Main startup
 async function main() {
-  console.log('='.repeat(55));
-  console.log('  eBay Listing Monitor - Production Version');
-  console.log('='.repeat(55));
-  console.log(`  Search:     "${CONFIG.searchQuery}"`);
+  console.log('='.repeat(60));
+  console.log('  eBay Listing Monitor - Multi-Search Production Version');
+  console.log('='.repeat(60));
+  console.log(`  Searches:   ${SEARCH_CONFIGS.length} configured`);
+  SEARCH_CONFIGS.forEach((config, i) => {
+    const webhookStatus = config.webhookUrl ? '✓' : '✗';
+    console.log(`              ${i + 1}. ${config.name}: "${config.searchQuery}" [${webhookStatus}]`);
+  });
   console.log(`  Interval:   ${CONFIG.checkIntervalMinutes} minutes`);
   console.log(`  Restart:    Every ${CONFIG.browserRestartHours} hours`);
   console.log(`  Health:     Every ${CONFIG.healthCheckHours} hours`);
-  console.log(`  Discord:    ${CONFIG.discordWebhookUrl ? 'Configured ✓' : 'NOT SET ✗'}`);
-  console.log('='.repeat(55));
+  console.log('='.repeat(60));
 
-  if (!CONFIG.discordWebhookUrl) {
-    console.log('\n[WARN] DISCORD_WEBHOOK_URL not set!');
-    console.log('[WARN] Set this in Railway environment variables.\n');
+  // Check webhook configuration
+  const missingWebhooks = SEARCH_CONFIGS.filter(c => !c.webhookUrl);
+  if (missingWebhooks.length > 0) {
+    console.log('\n[WARN] Missing Discord webhooks for:');
+    missingWebhooks.forEach(c => console.log(`       - ${c.name}`));
+    console.log('[WARN] Set these in Railway environment variables.\n');
   }
 
-  // Load state
-  let seenListings = loadSeenListings();
-  let isFirstRun = seenListings.size === 0;
-  console.log(`[INFO] Loaded ${seenListings.size} previously seen listings`);
+  // Initialize state for each search
+  for (const config of SEARCH_CONFIGS) {
+    const seenListings = loadSeenListings(config.dataFile);
+    searchStates.set(config.name, {
+      seenListings,
+      isFirstRun: seenListings.size === 0
+    });
+    console.log(`[INFO] Loaded ${seenListings.size} previously seen listings for "${config.name}"`);
+  }
 
   // Launch browser
   await launchBrowser();
@@ -525,18 +596,14 @@ async function main() {
   await sendStartupNotification();
 
   // Run initial check
-  const result = await checkForNewListings(seenListings, isFirstRun);
-  seenListings = result.seenListings;
-  isFirstRun = result.isFirstRun;
+  await checkAllSearches();
 
   // Schedule periodic checks
   const checkIntervalMs = CONFIG.checkIntervalMinutes * 60 * 1000;
   console.log(`\n[INFO] Next check in ${CONFIG.checkIntervalMinutes} minutes...`);
 
   setInterval(async () => {
-    const result = await checkForNewListings(seenListings, isFirstRun);
-    seenListings = result.seenListings;
-    isFirstRun = result.isFirstRun;
+    await checkAllSearches();
     console.log(`[INFO] Next check in ${CONFIG.checkIntervalMinutes} minutes...`);
   }, checkIntervalMs);
 
