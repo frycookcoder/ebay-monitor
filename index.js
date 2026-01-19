@@ -25,7 +25,7 @@ const SEARCH_CONFIGS = [
   },
   {
     name: 'Superfractor',
-    searchQuery: 'Spongebob Topps Superfractor',
+    searchQuery: 'Spongebob Topps "Superfractor"',
     webhookUrl: process.env.DISCORD_WEBHOOK_SUPERFRACTOR,
     dataFile: path.join(__dirname, 'seen_listings_superfractor.json')
   },
