@@ -424,10 +424,20 @@ async function scrapeListings(searchQuery, retryCount = 0) {
                    container?.querySelector('[class*="prc"]')?.textContent?.trim() ||
                    'N/A';
 
-        // Get image
-        let image = container?.querySelector('img[src*="ebayimg"]')?.src ||
-                   container?.querySelector('img')?.src ||
+        // Get image - check data-src first (lazy loading), then src
+        // Also try to get larger image by looking for ebayimg URLs
+        const imgElement = container?.querySelector('img[src*="ebayimg"]') ||
+                          container?.querySelector('img[data-src*="ebayimg"]') ||
+                          container?.querySelector('img');
+
+        let image = imgElement?.getAttribute('data-src') ||
+                   imgElement?.src ||
                    null;
+
+        // Upgrade image size if it's an eBay image URL (change s-l225 to s-l500 for better quality)
+        if (image && image.includes('ebayimg.com')) {
+          image = image.replace(/s-l\d+/, 's-l500');
+        }
 
         seenIds.add(itemId);
         items.push({
