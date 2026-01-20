@@ -41,6 +41,12 @@ const SEARCH_CONFIGS = [
     searchQuery: 'Spongebob Topps /5',
     webhookUrl: process.env.DISCORD_WEBHOOK_5,
     dataFile: path.join(__dirname, 'seen_listings_5.json')
+  },
+  {
+    name: 'DBS God Rare',
+    searchQuery: 'dragon ball super card "God Rare"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_DBS_GDR,
+    dataFile: path.join(__dirname, 'seen_listings_dbs_gdr.json')
   }
 ];
 
