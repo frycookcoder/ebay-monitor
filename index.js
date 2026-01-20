@@ -1,3 +1,4 @@
+require('dotenv').config();
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const fs = require('fs');
@@ -118,9 +119,12 @@ async function sendListingNotification(listing, searchConfig) {
     }
   };
 
-  // Add thumbnail if available
+  // Add image if available (use 'image' instead of 'thumbnail' for larger display)
   if (listing.image && listing.image.startsWith('http')) {
-    embed.thumbnail = { url: listing.image };
+    embed.image = { url: listing.image };
+    console.log(`[DEBUG] Sending image: ${listing.image.substring(0, 80)}...`);
+  } else {
+    console.log(`[WARN] No valid image for listing ${listing.id}: ${listing.image || 'null'}`);
   }
 
   const payload = {
@@ -388,55 +392,84 @@ async function scrapeListings(searchQuery, retryCount = 0) {
     // Small delay to ensure dynamic content loads
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Extract listings by finding all item links
+    // Scroll down the page to trigger lazy-loading of images
+    await page.evaluate(async () => {
+      await new Promise((resolve) => {
+        let totalHeight = 0;
+        const distance = 300;
+        const timer = setInterval(() => {
+          window.scrollBy(0, distance);
+          totalHeight += distance;
+          if (totalHeight >= document.body.scrollHeight || totalHeight > 3000) {
+            clearInterval(timer);
+            window.scrollTo(0, 0); // Scroll back to top
+            resolve();
+          }
+        }, 100);
+      });
+    });
+
+    // Wait for images to load after scrolling
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Extract listings using eBay's current card structure
+    // eBay uses li.s-card as the card container with:
+    // - div.s-card__title for title
+    // - span.s-card__price for price
+    // - img.s-card__image for image
     const listings = await page.evaluate(() => {
       const items = [];
       const seenIds = new Set();
 
-      // Find all links to eBay item pages
-      const allLinks = document.querySelectorAll('a[href*="/itm/"]');
+      // Find all card containers directly
+      const cards = document.querySelectorAll('li.s-card');
 
-      allLinks.forEach((linkElement) => {
-        const href = linkElement.href;
+      cards.forEach((card) => {
+        // Find item link to get ID and URL
+        const itemLink = card.querySelector('a[href*="/itm/"]');
+        if (!itemLink) return;
+
+        const href = itemLink.href;
         const urlMatch = href.match(/\/itm\/(\d+)/);
         const itemId = urlMatch ? urlMatch[1] : null;
 
-        // Skip if no ID or already processed
-        if (!itemId || seenIds.has(itemId)) return;
+        // Skip if no ID, already processed, or placeholder
+        if (!itemId || seenIds.has(itemId) || itemId === '123456') return;
 
-        // Find parent container
-        let container = linkElement.closest('[class*="s-card"]') ||
-                       linkElement.closest('[class*="x-item"]') ||
-                       linkElement.closest('li') ||
-                       linkElement.parentElement?.parentElement;
+        // Get title from the title div
+        const titleElement = card.querySelector('.s-card__title') ||
+                            card.querySelector('[class*="title"]');
+        let title = titleElement?.textContent?.trim() || '';
 
-        // Get title
-        let title = linkElement.textContent?.trim() ||
-                   linkElement.querySelector('[class*="title"]')?.textContent?.trim() ||
-                   container?.querySelector('[class*="title"]')?.textContent?.trim() ||
-                   container?.querySelector('h3')?.textContent?.trim();
+        // Clean up title - remove "New Listing" prefix and "Opens in..." suffix
+        title = title.replace(/^New Listing/, '').trim();
+        title = title.replace(/Opens in a new window or tab.*$/, '').trim();
 
         // Skip invalid titles
-        if (!title || title === '' || title.includes('Shop on eBay')) return;
+        if (!title || title.includes('Shop on eBay')) return;
 
         // Get price
-        let price = container?.querySelector('[class*="price"]')?.textContent?.trim() ||
-                   container?.querySelector('[class*="prc"]')?.textContent?.trim() ||
-                   'N/A';
+        const priceElement = card.querySelector('.s-card__price') ||
+                            card.querySelector('[class*="price"]');
+        const price = priceElement?.textContent?.trim() || 'N/A';
 
-        // Get image - check data-src first (lazy loading), then src
-        // Also try to get larger image by looking for ebayimg URLs
-        const imgElement = container?.querySelector('img[src*="ebayimg"]') ||
-                          container?.querySelector('img[data-src*="ebayimg"]') ||
-                          container?.querySelector('img');
+        // Get image
+        const imgElement = card.querySelector('img.s-card__image') ||
+                          card.querySelector('img[src*="ebayimg"]');
 
-        let image = imgElement?.getAttribute('data-src') ||
-                   imgElement?.src ||
-                   null;
+        let image = null;
+        if (imgElement) {
+          image = imgElement.src;
+          // Skip placeholder images
+          if (image && (image.includes('ebaystatic.com/rs/') || image.includes('data:image'))) {
+            image = null;
+          }
+        }
 
-        // Upgrade image size if it's an eBay image URL (change s-l225 to s-l500 for better quality)
+        // Upgrade image size if it's an eBay image URL
         if (image && image.includes('ebayimg.com')) {
           image = image.replace(/s-l\d+/, 's-l500');
+          image = image.replace('/thumbs/', '/images/');
         }
 
         seenIds.add(itemId);
@@ -505,6 +538,7 @@ async function checkSearch(searchConfig) {
           console.log(`[NEW] [${searchConfig.name}] ${listing.title?.substring(0, 60)}...`);
           console.log(`      Price: ${listing.price}`);
           console.log(`      URL: ${listing.url}`);
+          console.log(`      Image: ${listing.image ? listing.image.substring(0, 60) + '...' : 'NONE'}`);
 
           // Send Discord notification
           await sendListingNotification(listing, searchConfig);
