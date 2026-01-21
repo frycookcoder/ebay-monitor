@@ -47,6 +47,85 @@ const SEARCH_CONFIGS = [
     searchQuery: 'dragon ball super card "God Rare"',
     webhookUrl: process.env.DISCORD_WEBHOOK_DBS_GDR,
     dataFile: path.join(__dirname, 'seen_listings_dbs_gdr.json')
+  },
+  // Webkinz searches - exact match terms
+  {
+    name: 'Webkinz Tuxedo Cat',
+    searchQuery: 'webkinz "tuxedo cat"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_tuxedo_cat.json')
+  },
+  {
+    name: 'Webkinz English Cream Retriever',
+    searchQuery: 'webkinz "english cream retriever"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_english_cream_retriever.json')
+  },
+  {
+    name: 'Webkinz Salt Pepper Dalmatian',
+    searchQuery: 'webkinz "salt pepper dalmatian"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_salt_pepper_dalmatian.json')
+  },
+  {
+    name: 'Webkinz Cinnamon Beagle',
+    searchQuery: 'webkinz "cinnamon beagle"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_cinnamon_beagle.json')
+  },
+  {
+    name: 'Webkinz Corgi Dog',
+    searchQuery: 'webkinz "corgi dog"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_corgi_dog.json')
+  },
+  {
+    name: 'Webkinz Red Velvet Fox',
+    searchQuery: 'webkinz "red velvet fox"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_red_velvet_fox.json')
+  },
+  {
+    name: 'Webkinz Merry Go Round Pony',
+    searchQuery: 'webkinz "merry go round pony"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_merry_go_round_pony.json')
+  },
+  {
+    name: 'Webkinz Enchanted Giraffe',
+    searchQuery: 'webkinz "enchanted giraffe"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_enchanted_giraffe.json')
+  },
+  {
+    name: 'Webkinz Love Giraffe',
+    searchQuery: 'webkinz "love giraffe"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_love_giraffe.json')
+  },
+  {
+    name: 'Webkinz Lovely Leopard',
+    searchQuery: 'webkinz "lovely leopard"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_lovely_leopard.json')
+  },
+  {
+    name: 'Webkinz Blue Bay Dolphin',
+    searchQuery: 'webkinz "blue bay dolphin"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_blue_bay_dolphin.json')
+  },
+  {
+    name: 'Webkinz Splash Dragon',
+    searchQuery: 'webkinz "splash dragon"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_splash_dragon.json')
+  },
+  {
+    name: 'Webkinz Twilight Dragon',
+    searchQuery: 'webkinz "twilight dragon"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_twilight_dragon.json')
   }
 ];
 
