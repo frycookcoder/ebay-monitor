@@ -3,6 +3,7 @@ const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 // Use stealth plugin to avoid detection
 puppeteer.use(StealthPlugin());
@@ -13,7 +14,29 @@ const CONFIG = {
   browserRestartHours: parseFloat(process.env.BROWSER_RESTART_HOURS) || 2,
   maxRetries: parseInt(process.env.MAX_RETRIES) || 3,
   healthCheckHours: parseFloat(process.env.HEALTH_CHECK_HOURS) || 6,
+  hardRestartThreshold: parseInt(process.env.HARD_RESTART_THRESHOLD) || 10, // Force full restart after this many consecutive failures
+  browserCloseTimeout: 5000, // Max ms to wait for browser.close()
 };
+
+// Rotating user agents to avoid detection
+const USER_AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+];
+
+// Get random user agent
+function getRandomUserAgent() {
+  return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+}
+
+// Random delay between min and max milliseconds
+function randomDelay(min, max) {
+  return new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * (max - min + 1)) + min));
+}
 
 // Multi-search configuration
 // Each search has its own query, Discord webhook, and data file
@@ -394,17 +417,78 @@ async function sendErrorNotification(errorMessage) {
   }
 }
 
+// Force kill all Chrome/Chromium processes (nuclear option for resource cleanup)
+function forceKillChrome() {
+  console.log('[WARN] Force killing all Chrome processes...');
+  try {
+    // Linux/Docker environment
+    execSync('pkill -9 -f chrome || true', { stdio: 'ignore' });
+    execSync('pkill -9 -f chromium || true', { stdio: 'ignore' });
+  } catch (e) {
+    // Ignore errors - processes may not exist
+  }
+}
+
+// Safe browser close with timeout
+async function safeBrowserClose() {
+  if (!browser) return;
+
+  const browserPid = browser.process()?.pid;
+  console.log(`[INFO] Closing browser (PID: ${browserPid || 'unknown'})...`);
+
+  try {
+    // Race between browser.close() and timeout
+    await Promise.race([
+      browser.close(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Browser close timeout')), CONFIG.browserCloseTimeout)
+      )
+    ]);
+    console.log('[INFO] Browser closed gracefully');
+  } catch (e) {
+    console.log(`[WARN] Browser close failed: ${e.message}`);
+    // Force kill the specific browser process if we have its PID
+    if (browserPid) {
+      try {
+        process.kill(browserPid, 'SIGKILL');
+        console.log(`[INFO] Force killed browser process ${browserPid}`);
+      } catch (killError) {
+        // Process may already be dead
+      }
+    }
+  }
+
+  browser = null;
+  page = null;
+}
+
+// Hard restart - kill everything and exit (process manager should restart us)
+async function hardRestart(reason) {
+  console.error(`[FATAL] Hard restart triggered: ${reason}`);
+  await sendErrorNotification(`Hard restart triggered after ${consecutiveFailures} consecutive failures: ${reason}`);
+
+  // Force kill all Chrome processes
+  forceKillChrome();
+
+  // Give it a moment
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
+  // Exit - the process manager (Docker, PM2, systemd) should restart us
+  process.exit(1);
+}
+
 // Launch browser with stealth settings
 async function launchBrowser() {
   console.log('[INFO] Launching browser with stealth mode...');
 
-  if (browser) {
-    try {
-      await browser.close();
-    } catch (e) {
-      console.log('[WARN] Error closing old browser:', e.message);
-    }
-  }
+  // Safe close existing browser
+  await safeBrowserClose();
+
+  // Small delay after closing to ensure resources are freed
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
+  const userAgent = getRandomUserAgent();
+  console.log(`[INFO] Using user agent: ${userAgent.substring(0, 50)}...`);
 
   browser = await puppeteer.launch({
     headless: 'new',
@@ -418,22 +502,90 @@ async function launchBrowser() {
       '--disable-gpu',
       '--disable-blink-features=AutomationControlled',
       '--disable-web-security',
-      '--disable-features=IsolateOrigins,site-per-process'
+      '--disable-features=IsolateOrigins,site-per-process',
+      // Crash reporter fixes - prevents EAGAIN errors
+      '--disable-crash-reporter',
+      '--disable-breakpad',
+      '--disable-component-update',
+      // Additional stealth
+      '--disable-infobars',
+      '--window-size=1920,1080',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      // Memory management
+      '--single-process',
+      '--memory-pressure-off',
+      '--max_old_space_size=512'
     ]
   });
 
   page = await browser.newPage();
 
-  // Set viewport and user agent
-  await page.setViewport({ width: 1920, height: 1080 });
-  await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
+  // Randomize viewport slightly to avoid fingerprinting
+  const viewportWidth = 1920 + Math.floor(Math.random() * 100) - 50;
+  const viewportHeight = 1080 + Math.floor(Math.random() * 60) - 30;
+  await page.setViewport({ width: viewportWidth, height: viewportHeight });
 
-  // Set extra headers
+  // Use rotated user agent
+  await page.setUserAgent(userAgent);
+
+  // Override navigator properties for better stealth
+  await page.evaluateOnNewDocument(() => {
+    // Override webdriver
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+
+    // Override plugins
+    Object.defineProperty(navigator, 'plugins', {
+      get: () => [1, 2, 3, 4, 5]
+    });
+
+    // Override languages
+    Object.defineProperty(navigator, 'languages', {
+      get: () => ['en-US', 'en']
+    });
+
+    // Override platform
+    Object.defineProperty(navigator, 'platform', {
+      get: () => 'Win32'
+    });
+
+    // Override hardware concurrency
+    Object.defineProperty(navigator, 'hardwareConcurrency', {
+      get: () => 8
+    });
+
+    // Override device memory
+    Object.defineProperty(navigator, 'deviceMemory', {
+      get: () => 8
+    });
+
+    // Spoof chrome object
+    window.chrome = {
+      runtime: {}
+    };
+
+    // Override permissions
+    const originalQuery = window.navigator.permissions.query;
+    window.navigator.permissions.query = (parameters) =>
+      parameters.name === 'notifications'
+        ? Promise.resolve({ state: Notification.permission })
+        : originalQuery(parameters);
+  });
+
+  // Set extra headers to look more like a real browser
   await page.setExtraHTTPHeaders({
     'Accept-Language': 'en-US,en;q=0.9',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-    'Cache-Control': 'no-cache',
-    'Pragma': 'no-cache'
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'Cache-Control': 'max-age=0',
+    'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Upgrade-Insecure-Requests': '1'
   });
 
   browserStartTime = Date.now();
@@ -451,6 +603,11 @@ function shouldRestartBrowser() {
 async function scrapeListings(searchQuery, retryCount = 0) {
   const url = buildEbayUrl(searchQuery);
 
+  // Check for hard restart threshold BEFORE trying anything else
+  if (consecutiveFailures >= CONFIG.hardRestartThreshold) {
+    await hardRestart(`Consecutive failures reached ${consecutiveFailures}`);
+  }
+
   try {
     // Check if browser needs restart
     if (shouldRestartBrowser()) {
@@ -462,9 +619,14 @@ async function scrapeListings(searchQuery, retryCount = 0) {
     if (!page || page.isClosed()) {
       console.log('[INFO] Page was closed, recreating...');
       page = await browser.newPage();
-      await page.setViewport({ width: 1920, height: 1080 });
-      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
+      const viewportWidth = 1920 + Math.floor(Math.random() * 100) - 50;
+      const viewportHeight = 1080 + Math.floor(Math.random() * 60) - 30;
+      await page.setViewport({ width: viewportWidth, height: viewportHeight });
+      await page.setUserAgent(getRandomUserAgent());
     }
+
+    // Random delay before navigation (1-3 seconds) to appear more human
+    await randomDelay(1000, 3000);
 
     console.log(`[INFO] Navigating to eBay for: "${searchQuery}"`);
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
@@ -474,28 +636,46 @@ async function scrapeListings(searchQuery, retryCount = 0) {
       console.log('[WARN] Search results container not found, trying anyway...');
     });
 
-    // Small delay to ensure dynamic content loads
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Random delay to appear more human (1.5-3 seconds)
+    await randomDelay(1500, 3000);
 
-    // Scroll down the page to trigger lazy-loading of images
+    // Simulate human-like mouse movement
+    try {
+      const viewport = page.viewport();
+      await page.mouse.move(
+        Math.floor(Math.random() * viewport.width * 0.6) + viewport.width * 0.2,
+        Math.floor(Math.random() * viewport.height * 0.3) + 100
+      );
+    } catch (e) {
+      // Ignore mouse movement errors
+    }
+
+    // Scroll down the page with human-like behavior
     await page.evaluate(async () => {
       await new Promise((resolve) => {
         let totalHeight = 0;
-        const distance = 300;
-        const timer = setInterval(() => {
+        // Randomize scroll distance to appear more human
+        const scrollStep = () => {
+          const distance = 200 + Math.floor(Math.random() * 200); // 200-400px
           window.scrollBy(0, distance);
           totalHeight += distance;
           if (totalHeight >= document.body.scrollHeight || totalHeight > 3000) {
-            clearInterval(timer);
-            window.scrollTo(0, 0); // Scroll back to top
-            resolve();
+            // Scroll back to top with slight randomness
+            setTimeout(() => {
+              window.scrollTo(0, 0);
+              resolve();
+            }, 100 + Math.floor(Math.random() * 200));
+          } else {
+            // Random delay between scrolls (80-200ms)
+            setTimeout(scrollStep, 80 + Math.floor(Math.random() * 120));
           }
-        }, 100);
+        };
+        scrollStep();
       });
     });
 
-    // Wait for images to load after scrolling
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Random wait for images to load (800-1500ms)
+    await randomDelay(800, 1500);
 
     // Extract listings using eBay's current card structure
     // eBay uses li.s-card as the card container with:
@@ -577,9 +757,23 @@ async function scrapeListings(searchQuery, retryCount = 0) {
     console.error(`[ERROR] Scrape failed (attempt ${retryCount + 1}):`, error.message);
     consecutiveFailures++;
 
+    // Check for hard restart threshold
+    if (consecutiveFailures >= CONFIG.hardRestartThreshold) {
+      await hardRestart(`Consecutive failures reached ${consecutiveFailures}`);
+    }
+
     if (retryCount < CONFIG.maxRetries) {
-      console.log(`[INFO] Retrying in 10 seconds... (${retryCount + 1}/${CONFIG.maxRetries})`);
-      await new Promise(resolve => setTimeout(resolve, 10000));
+      // Exponential backoff: 10s, 20s, 40s
+      const backoffTime = 10000 * Math.pow(2, retryCount);
+      console.log(`[INFO] Retrying in ${backoffTime / 1000} seconds... (${retryCount + 1}/${CONFIG.maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, backoffTime));
+
+      // Force kill Chrome if we're on the last retry
+      if (retryCount === CONFIG.maxRetries - 1) {
+        console.log('[WARN] Last retry - forcing Chrome cleanup...');
+        forceKillChrome();
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
 
       // Restart browser on retry
       await launchBrowser();
@@ -674,8 +868,8 @@ async function checkAllSearches() {
     const newCount = await checkSearch(searchConfig);
     totalNew += newCount;
 
-    // Small delay between searches to be respectful to eBay
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // Random delay between searches (3-8 seconds) to appear more human-like
+    await randomDelay(3000, 8000);
   }
 
   totalChecks++;
@@ -745,9 +939,8 @@ async function main() {
   // Handle graceful shutdown
   const shutdown = async (signal) => {
     console.log(`\n[INFO] Received ${signal}, shutting down gracefully...`);
-    try {
-      if (browser) await browser.close();
-    } catch (e) {}
+    await safeBrowserClose();
+    forceKillChrome(); // Ensure all Chrome processes are dead
     process.exit(0);
   };
 
@@ -757,14 +950,33 @@ async function main() {
   // Handle uncaught errors
   process.on('uncaughtException', async (error) => {
     console.error('[FATAL] Uncaught exception:', error.message);
+    consecutiveFailures++;
     await sendErrorNotification(`Uncaught exception: ${error.message}`);
-    // Don't exit - try to keep running
+
+    // Trigger hard restart if too many failures
+    if (consecutiveFailures >= CONFIG.hardRestartThreshold) {
+      await hardRestart(`Uncaught exception after ${consecutiveFailures} failures: ${error.message}`);
+    }
+
+    // Try to recover by restarting browser
+    try {
+      forceKillChrome();
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      await launchBrowser();
+    } catch (e) {
+      console.error('[FATAL] Recovery failed:', e.message);
+    }
   });
 
   process.on('unhandledRejection', async (reason) => {
     console.error('[FATAL] Unhandled rejection:', reason);
+    consecutiveFailures++;
     await sendErrorNotification(`Unhandled rejection: ${reason}`);
-    // Don't exit - try to keep running
+
+    // Trigger hard restart if too many failures
+    if (consecutiveFailures >= CONFIG.hardRestartThreshold) {
+      await hardRestart(`Unhandled rejection after ${consecutiveFailures} failures: ${reason}`);
+    }
   });
 
   console.log('[INFO] Monitor is running. Will notify on new listings.');
