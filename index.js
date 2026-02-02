@@ -149,6 +149,37 @@ const SEARCH_CONFIGS = [
     searchQuery: 'webkinz "twilight dragon"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
     dataFile: path.join(__dirname, 'seen_listings_webkinz_twilight_dragon.json')
+  },
+  // Lorcana card searches
+  {
+    name: 'Lorcana Iconic Mickey',
+    searchQuery: 'Lorcana Iconic Mickey',
+    webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_iconic_mickey.json')
+  },
+  {
+    name: 'Lorcana Iconic Minnie',
+    searchQuery: 'Lorcana Iconic Minnie',
+    webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_iconic_minnie.json')
+  },
+  {
+    name: 'Lorcana Hunny Wizard Enchanted',
+    searchQuery: 'Lorcana Hunny Wizard Enchanted',
+    webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_hunny_wizard_enchanted.json')
+  },
+  {
+    name: 'Lorcana Elsa Enchanted PSA 10',
+    searchQuery: 'Lorcana Elsa Enchanted PSA 10',
+    webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_elsa_enchanted_psa10.json')
+  },
+  {
+    name: 'Lorcana Golden Mickey Serial',
+    searchQuery: 'Lorcana Golden Mickey Serial',
+    webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_golden_mickey_serial.json')
   }
 ];
 
