@@ -81,6 +81,36 @@ Add `DISCORD_WEBHOOK_YOURNAME` in Railway dashboard under Variables.
 - `BROWSER_RESTART_HOURS` - Restart browser every N hours (default: 2)
 - `MAX_RETRIES` - Retry attempts on failure (default: 3)
 - `HEALTH_CHECK_HOURS` - Health notification interval (default: 6)
+- `HARD_RESTART_THRESHOLD` - Force full restart after N consecutive failures (default: 10)
+
+## Anti-Detection Features
+The monitor uses `puppeteer-extra-plugin-stealth` plus additional measures to avoid eBay blocking:
+
+- **User Agent Rotation** - Randomly selects from 6 different browser user agents each session
+- **Randomized Viewport** - Slight random variations in window size to avoid fingerprinting
+- **Navigator Overrides** - Spoofs webdriver, plugins, languages, platform, hardware concurrency
+- **Human-like Behavior:**
+  - Random delays between page loads (1-3 seconds)
+  - Random delays between searches (3-8 seconds)
+  - Simulated mouse movements
+  - Human-like scrolling with random scroll distances and timing
+- **Stealth Headers** - Sets sec-ch-ua, Sec-Fetch-* headers to match real Chrome
+
+## Crash Recovery & Stability
+The monitor has multiple layers of recovery to stay running 24/7:
+
+1. **Automatic Browser Restart** - Restarts Chromium every 2 hours to prevent memory leaks
+2. **Retry with Exponential Backoff** - Failed scrapes retry 3 times (10s, 20s, 40s delays)
+3. **Page Recovery** - Detects closed pages and recreates them
+4. **Safe Browser Close** - Timeout-protected browser.close() with force kill fallback
+5. **Hard Restart** - After 10 consecutive failures, exits process (Railway auto-restarts)
+6. **Chrome Force Kill** - Uses `pkill` to clean up zombie Chrome processes
+7. **Error Notifications** - Sends Discord alerts when errors occur
+
+Key functions for crash handling:
+- `safeBrowserClose()` - Graceful close with timeout
+- `forceKillChrome()` - Nuclear option to kill all Chrome processes
+- `hardRestart()` - Exits process for Railway to restart fresh
 
 ## Tips for Claude
 - The main file is `index.js` - read it first
