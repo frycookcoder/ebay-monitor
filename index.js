@@ -150,36 +150,55 @@ const SEARCH_CONFIGS = [
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
     dataFile: path.join(__dirname, 'seen_listings_webkinz_twilight_dragon.json')
   },
-  // Lorcana card searches
+  // Lorcana card searches - with category filter (2536 = Trading Card Games)
+  // requiredKeywords: all terms must appear in title (case-insensitive) or listing is filtered out
   {
     name: 'Lorcana Iconic Mickey',
     searchQuery: 'Lorcana Iconic Mickey',
     webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
-    dataFile: path.join(__dirname, 'seen_listings_lorcana_iconic_mickey.json')
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_iconic_mickey.json'),
+    category: 2536,
+    requiredKeywords: ['iconic', 'mickey']
   },
   {
     name: 'Lorcana Iconic Minnie',
     searchQuery: 'Lorcana Iconic Minnie',
     webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
-    dataFile: path.join(__dirname, 'seen_listings_lorcana_iconic_minnie.json')
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_iconic_minnie.json'),
+    category: 2536,
+    requiredKeywords: ['iconic', 'minnie']
   },
   {
     name: 'Lorcana Hunny Wizard Enchanted',
     searchQuery: 'Lorcana Hunny Wizard Enchanted',
     webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
-    dataFile: path.join(__dirname, 'seen_listings_lorcana_hunny_wizard_enchanted.json')
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_hunny_wizard_enchanted.json'),
+    category: 2536,
+    requiredKeywords: ['hunny', 'wizard']
   },
   {
     name: 'Lorcana Elsa Enchanted PSA 10',
     searchQuery: 'Lorcana Elsa Enchanted PSA 10',
     webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
-    dataFile: path.join(__dirname, 'seen_listings_lorcana_elsa_enchanted_psa10.json')
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_elsa_enchanted_psa10.json'),
+    category: 2536,
+    requiredKeywords: ['elsa', 'enchanted']
   },
   {
     name: 'Lorcana Golden Mickey Serial',
     searchQuery: 'Lorcana Golden Mickey Serial',
     webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
-    dataFile: path.join(__dirname, 'seen_listings_lorcana_golden_mickey_serial.json')
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_golden_mickey_serial.json'),
+    category: 2536,
+    requiredKeywords: ['golden', 'mickey']
+  },
+  {
+    name: 'Lorcana D23 Elsa Promo',
+    searchQuery: 'Lorcana D23 Elsa Promo',
+    webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_d23_elsa_promo.json'),
+    category: 2536,
+    requiredKeywords: ['d23', 'elsa']
   },
   // Riftbound searches
   {
@@ -203,9 +222,29 @@ let consecutiveFailures = 0;
 const searchStates = new Map();
 
 // Build eBay search URL (sorted by newly listed)
-function buildEbayUrl(query) {
+// category 2536 = Trading Card Games
+function buildEbayUrl(query, category = null) {
   const encodedQuery = encodeURIComponent(query);
-  return `https://www.ebay.com/sch/i.html?_nkw=${encodedQuery}&_sop=10`;
+  let url = `https://www.ebay.com/sch/i.html?_nkw=${encodedQuery}&_sop=10`;
+  if (category) {
+    url += `&_sacat=${category}`;
+  }
+  return url;
+}
+
+// Check if listing passes required keywords filter
+// Returns true if listing should be included, false if filtered out
+function passesKeywordFilter(listing, requiredKeywords) {
+  if (!requiredKeywords || requiredKeywords.length === 0) {
+    return true; // No filter configured
+  }
+  const titleLower = (listing.title || '').toLowerCase();
+  for (const keyword of requiredKeywords) {
+    if (!titleLower.includes(keyword.toLowerCase())) {
+      return false; // Missing required keyword
+    }
+  }
+  return true;
 }
 
 // Load seen listings from file
@@ -638,8 +677,9 @@ function shouldRestartBrowser() {
 }
 
 // Scrape listings from eBay page with retry logic
-async function scrapeListings(searchQuery, retryCount = 0) {
-  const url = buildEbayUrl(searchQuery);
+async function scrapeListings(searchConfig, retryCount = 0) {
+  const { searchQuery, category } = searchConfig;
+  const url = buildEbayUrl(searchQuery, category);
 
   // Check for hard restart threshold BEFORE trying anything else
   if (consecutiveFailures >= CONFIG.hardRestartThreshold) {
@@ -815,7 +855,7 @@ async function scrapeListings(searchQuery, retryCount = 0) {
 
       // Restart browser on retry
       await launchBrowser();
-      return scrapeListings(searchQuery, retryCount + 1);
+      return scrapeListings(searchConfig, retryCount + 1);
     }
 
     // Send error notification after max retries
@@ -834,7 +874,7 @@ async function checkSearch(searchConfig) {
   console.log(`[INFO] Checking: "${searchConfig.searchQuery}"`);
 
   try {
-    const listings = await scrapeListings(searchConfig.searchQuery);
+    const listings = await scrapeListings(searchConfig);
 
     if (listings.length === 0) {
       console.log(`[WARN] [${searchConfig.name}] No listings found`);
@@ -852,6 +892,13 @@ async function checkSearch(searchConfig) {
         if (state.isFirstRun) {
           console.log(`[INIT] [${searchConfig.name}] ${listing.title?.substring(0, 50)}...`);
         } else {
+          // Check if listing passes keyword filter (if configured)
+          if (!passesKeywordFilter(listing, searchConfig.requiredKeywords)) {
+            console.log(`[FILTERED] [${searchConfig.name}] ${listing.title?.substring(0, 60)}...`);
+            console.log(`           Missing required keywords: ${searchConfig.requiredKeywords.join(', ')}`);
+            continue; // Skip this listing, don't notify
+          }
+
           console.log(`[NEW] [${searchConfig.name}] ${listing.title?.substring(0, 60)}...`);
           console.log(`      Price: ${listing.price}`);
           console.log(`      URL: ${listing.url}`);
