@@ -180,6 +180,13 @@ const SEARCH_CONFIGS = [
     searchQuery: 'Lorcana Golden Mickey Serial',
     webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
     dataFile: path.join(__dirname, 'seen_listings_lorcana_golden_mickey_serial.json')
+  },
+  // Riftbound searches
+  {
+    name: 'Riftbound Prize Wall',
+    searchQuery: 'Riftbound Prize Wall',
+    webhookUrl: process.env.DISCORD_WEBHOOK_RIFTBOUND,
+    dataFile: path.join(__dirname, 'seen_listings_riftbound_prize_wall.json')
   }
 ];
 
