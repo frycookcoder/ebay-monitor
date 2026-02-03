@@ -213,6 +213,13 @@ const SEARCH_CONFIGS = [
     webhookUrl: process.env.DISCORD_WEBHOOK_RIFTBOUND,
     dataFile: path.join(__dirname, 'seen_listings_riftbound_prize_wall.json'),
     requiredKeywords: ['prize', 'wall']
+  },
+  {
+    name: 'Riftbound GGEZ Teemo',
+    searchQuery: 'Riftbound GGEZ Teemo',
+    webhookUrl: process.env.DISCORD_WEBHOOK_RIFTBOUND,
+    dataFile: path.join(__dirname, 'seen_listings_riftbound_ggez_teemo.json'),
+    requiredKeywords: ['ggez', 'teemo']
   }
 ];
 
