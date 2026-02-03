@@ -211,7 +211,8 @@ const SEARCH_CONFIGS = [
     name: 'Riftbound Prize Wall',
     searchQuery: 'Riftbound Prize Wall',
     webhookUrl: process.env.DISCORD_WEBHOOK_RIFTBOUND,
-    dataFile: path.join(__dirname, 'seen_listings_riftbound_prize_wall.json')
+    dataFile: path.join(__dirname, 'seen_listings_riftbound_prize_wall.json'),
+    requiredKeywords: ['prize', 'wall']
   }
 ];
 
