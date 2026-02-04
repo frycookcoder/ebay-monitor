@@ -575,6 +575,7 @@ async function launchBrowser() {
 
   browser = await puppeteer.launch({
     headless: 'new',
+    protocolTimeout: 240000, // 4 minutes - prevents timeout errors on slow containers
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
