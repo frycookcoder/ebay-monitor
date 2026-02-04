@@ -45,116 +45,108 @@ const SEARCH_CONFIGS = [
     name: 'Sketch',
     searchQuery: 'Spongebob Topps Sketch',
     webhookUrl: process.env.DISCORD_WEBHOOK_SKETCH,
-    dataFile: path.join(__dirname, 'seen_listings_sketch.json')
+    dataFile: path.join(__dirname, 'seen_listings_sketch.json'),
+    requiredKeywords: ['spongebob', 'sketch']
   },
   {
     name: 'Superfractor',
     searchQuery: 'Spongebob Topps "Superfractor"',
     webhookUrl: process.env.DISCORD_WEBHOOK_SUPERFRACTOR,
-    dataFile: path.join(__dirname, 'seen_listings_superfractor.json')
+    dataFile: path.join(__dirname, 'seen_listings_superfractor.json'),
+    requiredKeywords: ['spongebob', 'superfractor']
   },
   {
     name: '1/1',
     searchQuery: 'Spongebob Topps 1/1',
     webhookUrl: process.env.DISCORD_WEBHOOK_1OF1,
-    dataFile: path.join(__dirname, 'seen_listings_1of1.json')
+    dataFile: path.join(__dirname, 'seen_listings_1of1.json'),
+    requiredKeywords: ['spongebob', '1/1']
   },
   {
     name: '/5',
     searchQuery: 'Spongebob Topps /5',
     webhookUrl: process.env.DISCORD_WEBHOOK_5,
-    dataFile: path.join(__dirname, 'seen_listings_5.json')
+    dataFile: path.join(__dirname, 'seen_listings_5.json'),
+    requiredKeywords: ['spongebob', '/5']
   },
   {
     name: '/10 Black',
     searchQuery: 'Spongebob Topps /10 black',
     webhookUrl: process.env.DISCORD_WEBHOOK_5,
-    dataFile: path.join(__dirname, 'seen_listings_10_black.json')
+    dataFile: path.join(__dirname, 'seen_listings_10_black.json'),
+    requiredKeywords: ['spongebob', '/10']
   },
   {
     name: 'DBS God Rare',
     searchQuery: 'dragon ball super card "God Rare"',
     webhookUrl: process.env.DISCORD_WEBHOOK_DBS_GDR,
-    dataFile: path.join(__dirname, 'seen_listings_dbs_gdr.json')
+    dataFile: path.join(__dirname, 'seen_listings_dbs_gdr.json'),
+    requiredKeywords: ['dragon ball', 'god rare']
   },
   // Webkinz searches - exact match terms
-  {
-    name: 'Webkinz Tuxedo Cat',
-    searchQuery: 'webkinz "tuxedo cat"',
-    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_tuxedo_cat.json')
-  },
+  // requiredKeywords ensures wrong search results don't get sent to wrong webhooks
   {
     name: 'Webkinz English Cream Retriever',
     searchQuery: 'webkinz "english cream retriever"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_english_cream_retriever.json')
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_english_cream_retriever.json'),
+    requiredKeywords: ['webkinz']
   },
   {
     name: 'Webkinz Salt Pepper Dalmatian',
     searchQuery: 'webkinz "salt pepper dalmatian"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_salt_pepper_dalmatian.json')
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_salt_pepper_dalmatian.json'),
+    requiredKeywords: ['webkinz']
   },
   {
     name: 'Webkinz Cinnamon Beagle',
     searchQuery: 'webkinz "cinnamon beagle"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_cinnamon_beagle.json')
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_cinnamon_beagle.json'),
+    requiredKeywords: ['webkinz']
   },
   {
     name: 'Webkinz Corgi Dog',
     searchQuery: 'webkinz "corgi dog"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_corgi_dog.json')
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_corgi_dog.json'),
+    requiredKeywords: ['webkinz']
   },
   {
     name: 'Webkinz Red Velvet Fox',
     searchQuery: 'webkinz "red velvet fox"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_red_velvet_fox.json')
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_red_velvet_fox.json'),
+    requiredKeywords: ['webkinz']
   },
   {
     name: 'Webkinz Merry Go Round Pony',
     searchQuery: 'webkinz "merry go round pony"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_merry_go_round_pony.json')
-  },
-  {
-    name: 'Webkinz Enchanted Giraffe',
-    searchQuery: 'webkinz "enchanted giraffe"',
-    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_enchanted_giraffe.json')
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_merry_go_round_pony.json'),
+    requiredKeywords: ['webkinz']
   },
   {
     name: 'Webkinz Love Giraffe',
     searchQuery: 'webkinz "love giraffe"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_love_giraffe.json')
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_love_giraffe.json'),
+    requiredKeywords: ['webkinz']
   },
   {
     name: 'Webkinz Lovely Leopard',
     searchQuery: 'webkinz "lovely leopard"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_lovely_leopard.json')
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_lovely_leopard.json'),
+    requiredKeywords: ['webkinz']
   },
   {
     name: 'Webkinz Blue Bay Dolphin',
     searchQuery: 'webkinz "blue bay dolphin"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_blue_bay_dolphin.json')
-  },
-  {
-    name: 'Webkinz Splash Dragon',
-    searchQuery: 'webkinz "splash dragon"',
-    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_splash_dragon.json')
-  },
-  {
-    name: 'Webkinz Twilight Dragon',
-    searchQuery: 'webkinz "twilight dragon"',
-    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_twilight_dragon.json')
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_blue_bay_dolphin.json'),
+    requiredKeywords: ['webkinz']
   },
   // Lorcana card searches - with category filter (2536 = Trading Card Games)
   // requiredKeywords: all terms must appear in title (case-insensitive) or listing is filtered out
@@ -720,8 +712,29 @@ async function scrapeListings(searchConfig, retryCount = 0) {
     // Random delay before navigation (1-3 seconds) to appear more human
     await randomDelay(1000, 3000);
 
+    // Clear page state before navigating to prevent stale DOM issues
+    // This forces a clean slate and prevents previous search results from bleeding through
+    await page.goto('about:blank', { waitUntil: 'load', timeout: 5000 }).catch(() => {});
+    await randomDelay(200, 500);
+
     console.log(`[INFO] Navigating to eBay for: "${searchQuery}"`);
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+
+    // Verify we landed on the correct search page
+    const currentUrl = page.url();
+    const expectedQueryEncoded = encodeURIComponent(searchQuery).toLowerCase();
+    const currentUrlLower = currentUrl.toLowerCase();
+
+    if (!currentUrlLower.includes('ebay.com') || !currentUrlLower.includes('_nkw=')) {
+      throw new Error(`Navigation failed - landed on unexpected page: ${currentUrl.substring(0, 100)}`);
+    }
+
+    // Check if the URL contains our search terms (eBay may re-encode slightly)
+    const searchTerms = searchQuery.toLowerCase().split(' ').filter(t => t.length > 2 && !t.startsWith('"'));
+    const urlHasSearchTerms = searchTerms.some(term => currentUrlLower.includes(encodeURIComponent(term).toLowerCase()));
+    if (!urlHasSearchTerms && searchTerms.length > 0) {
+      throw new Error(`URL mismatch - page may have stale content. Expected: "${searchQuery}", Got: ${currentUrl.substring(0, 100)}`);
+    }
 
     // Wait for search results to load
     await page.waitForSelector('.srp-results', { timeout: 30000 }).catch(() => {
