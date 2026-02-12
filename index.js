@@ -77,6 +77,13 @@ const SEARCH_CONFIGS = [
     requiredKeywords: ['spongebob', '/10']
   },
   {
+    name: 'License',
+    searchQuery: 'Spongebob Topps License',
+    webhookUrl: process.env.DISCORD_WEBHOOK_5,
+    dataFile: path.join(__dirname, 'seen_listings_license.json'),
+    requiredKeywords: ['spongebob', 'license']
+  },
+  {
     name: 'DBS God Rare',
     searchQuery: 'dragon ball super card "God Rare"',
     webhookUrl: process.env.DISCORD_WEBHOOK_DBS_GDR,
@@ -981,8 +988,8 @@ async function checkAllSearches() {
     const newCount = await checkSearch(searchConfig);
     totalNew += newCount;
 
-    // Random delay between searches (3-8 seconds) to appear more human-like
-    await randomDelay(3000, 8000);
+    // Random delay between searches (5-12 seconds) to appear more human-like
+    await randomDelay(5000, 12000);
   }
 
   totalChecks++;
