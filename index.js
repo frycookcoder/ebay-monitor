@@ -85,6 +85,13 @@ const SEARCH_CONFIGS = [
     requiredKeywords: ['spongebob', 'license']
   },
   {
+    name: 'Permit',
+    searchQuery: 'Spongebob Topps Permit',
+    webhookUrl: process.env.DISCORD_WEBHOOK_5,
+    dataFile: path.join(__dirname, 'seen_listings_permit.json'),
+    requiredKeywords: ['spongebob', 'permit']
+  },
+  {
     name: 'DBS God Rare',
     searchQuery: 'dragon ball super card "God Rare"',
     webhookUrl: process.env.DISCORD_WEBHOOK_DBS_GDR,
@@ -97,42 +104,42 @@ const SEARCH_CONFIGS = [
     searchQuery: 'webkinz "english cream retriever"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
     dataFile: path.join(__dirname, 'seen_listings_webkinz_english_cream_retriever.json'),
-    requiredKeywords: ['webkinz']
+    requiredKeywords: ['webkinz', 'retriever']
   },
   {
     name: 'Webkinz Red Velvet Fox',
     searchQuery: 'webkinz "red velvet fox"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
     dataFile: path.join(__dirname, 'seen_listings_webkinz_red_velvet_fox.json'),
-    requiredKeywords: ['webkinz']
+    requiredKeywords: ['webkinz', 'fox']
   },
   {
     name: 'Webkinz Merry Go Round Pony',
     searchQuery: 'webkinz "merry go round pony"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
     dataFile: path.join(__dirname, 'seen_listings_webkinz_merry_go_round_pony.json'),
-    requiredKeywords: ['webkinz']
+    requiredKeywords: ['webkinz', 'pony']
   },
   {
     name: 'Webkinz Love Giraffe',
     searchQuery: 'webkinz "love giraffe"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
     dataFile: path.join(__dirname, 'seen_listings_webkinz_love_giraffe.json'),
-    requiredKeywords: ['webkinz']
+    requiredKeywords: ['webkinz', 'giraffe']
   },
   {
     name: 'Webkinz Lovely Leopard',
     searchQuery: 'webkinz "lovely leopard"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
     dataFile: path.join(__dirname, 'seen_listings_webkinz_lovely_leopard.json'),
-    requiredKeywords: ['webkinz']
+    requiredKeywords: ['webkinz', 'leopard']
   },
   {
     name: 'Webkinz Blue Bay Dolphin',
     searchQuery: 'webkinz "blue bay dolphin"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
     dataFile: path.join(__dirname, 'seen_listings_webkinz_blue_bay_dolphin.json'),
-    requiredKeywords: ['webkinz']
+    requiredKeywords: ['webkinz', 'dolphin']
   },
   {
     name: 'Webkinz Narwhal',
