@@ -19,13 +19,84 @@ ebay monitor/
 ```
 
 ## How Monitors Work
-All search monitors are defined in the `SEARCH_CONFIGS` array in `index.js` (starts around line 43).
+All search monitors are defined in the `SEARCH_CONFIGS` array in `index.js` (starts around line 55).
 
 Each monitor has:
 - `name` - Display name for logs/notifications
 - `searchQuery` - The eBay search query
 - `webhookUrl` - Discord webhook (from env var)
 - `dataFile` - JSON file to track seen listings
+- `requiredKeywords` - ALL keywords must match (array)
+- `requiredKeywordsAny` - At least ONE keyword must match (array, optional)
+- `category` - eBay category ID (optional, e.g., 2536 for Trading Card Games)
+
+## Current Monitors (10 total - Consolidated from 24)
+
+### Spongebob Topps (2 searches)
+- **Spongebob Topps Hits** - Catches sketch, superfractor, 1/1, /5, /10, license, auto, plate
+- **Spongebob Topps Numbered** - General numbered cards
+- Webhook: `DISCORD_WEBHOOK_SPONGEBOB`
+
+### Dragon Ball Super (1 search)
+- **DBS God Rare** - God Rare cards
+- Webhook: `DISCORD_WEBHOOK_DBS_GDR`
+
+### Webkinz (2 searches)
+- **Webkinz Rare Plush** - Specific rare plush items
+- **Webkinz Retired** - Retired plush items
+- Webhook: `DISCORD_WEBHOOK_WEBKINZ`
+
+### Lorcana (3 searches)
+- **Lorcana Iconic** - Mickey and Minnie Iconic cards
+- **Lorcana Enchanted Rare** - Hunny Wizard, Elsa Enchanted, PSA graded
+- **Lorcana Promo Serial** - Golden Mickey, D23 promos, serial numbered
+- Webhook: `DISCORD_WEBHOOK_LORCANA`
+
+### Riftbound (1 search)
+- **Riftbound Rare** - Prize Wall, GGEZ Teemo, promos
+- Webhook: `DISCORD_WEBHOOK_RIFTBOUND`
+
+## Configuration (via env vars)
+- `CHECK_INTERVAL` - Minutes between checks (default: 15)
+- `BROWSER_RESTART_HOURS` - Restart browser every N hours (default: 2)
+- `MAX_RETRIES` - Retry attempts on failure (default: 3)
+- `HEALTH_CHECK_HOURS` - Health notification interval (default: 6)
+- `HARD_RESTART_THRESHOLD` - Force full restart after N consecutive failures (default: 10)
+
+## Proxy Support (Recommended)
+To avoid eBay CAPTCHA detection, configure a residential proxy:
+
+```env
+# Single proxy
+PROXY_URL=http://username:password@proxy.example.com:8080
+
+# Or rotating proxy pool
+PROXY_POOL=http://user:pass@proxy1.com:8080,http://user:pass@proxy2.com:8080
+```
+
+Recommended services: Smartproxy, Bright Data, IPRoyal (residential IPs)
+
+## Anti-Detection Features
+- **Stealth Plugin** - puppeteer-extra-plugin-stealth
+- **User Agent Rotation** - 6 different browser user agents
+- **Randomized Viewport** - Slight random variations in window size
+- **Navigator Overrides** - Spoofs webdriver, plugins, languages, platform
+- **Human-like Behavior:**
+  - Random delays between page loads (1-3 seconds)
+  - Random delays between searches (10-25 seconds)
+  - Simulated mouse movements
+  - Human-like scrolling with random scroll distances and timing
+- **CAPTCHA Cooldown** - 5 minute pause when challenge detected
+- **Proxy Support** - Optional residential proxy rotation
+
+## Crash Recovery & Stability
+- **Running Lock** - Prevents overlapping check cycles
+- **CAPTCHA Detection** - Auto-pauses when eBay challenge detected
+- **setTimeout Pattern** - Schedules next check only after current completes
+- **Automatic Browser Restart** - Restarts Chromium every 2 hours
+- **Retry with Exponential Backoff** - Failed scrapes retry 3 times (10s, 20s, 40s)
+- **Hard Restart** - After 10 consecutive failures, exits for Railway to restart
+- **Chrome Force Kill** - Uses `pkill` to clean up zombie Chrome processes
 
 ## Adding New Monitors
 
@@ -35,7 +106,9 @@ Each monitor has:
   name: 'Your Monitor Name',
   searchQuery: 'your search terms here',
   webhookUrl: process.env.DISCORD_WEBHOOK_YOURNAME,
-  dataFile: path.join(__dirname, 'seen_listings_your_name.json')
+  dataFile: path.join(__dirname, 'seen_listings_your_name.json'),
+  requiredKeywords: ['must', 'match', 'all'],
+  requiredKeywordsAny: ['match', 'any', 'of', 'these'] // optional
 }
 ```
 
@@ -54,67 +127,9 @@ git push origin main
 ### Step 4: Add env var in Railway
 Add `DISCORD_WEBHOOK_YOURNAME` in Railway dashboard under Variables.
 
-## Current Monitors (18 total)
-
-### Spongebob Cards (4)
-- Sketch, Superfractor, 1/1, /5
-- Webhooks: `DISCORD_WEBHOOK_SKETCH`, `_SUPERFRACTOR`, `_1OF1`, `_5`
-
-### Dragon Ball Super (1)
-- God Rare cards
-- Webhook: `DISCORD_WEBHOOK_DBS_GDR`
-
-### Webkinz (13)
-- Various plush items (Tuxedo Cat, English Cream Retriever, etc.)
-- Webhook: `DISCORD_WEBHOOK_WEBKINZ` (shared)
-
-### Lorcana Cards (5) - Added 2026-02-01
-- Iconic Mickey
-- Iconic Minnie
-- Hunny Wizard Enchanted
-- Elsa Enchanted PSA 10
-- Golden Mickey Serial
-- Webhook: `DISCORD_WEBHOOK_LORCANA` (shared)
-
-## Configuration (via env vars)
-- `CHECK_INTERVAL` - Minutes between checks (default: 10)
-- `BROWSER_RESTART_HOURS` - Restart browser every N hours (default: 2)
-- `MAX_RETRIES` - Retry attempts on failure (default: 3)
-- `HEALTH_CHECK_HOURS` - Health notification interval (default: 6)
-- `HARD_RESTART_THRESHOLD` - Force full restart after N consecutive failures (default: 10)
-
-## Anti-Detection Features
-The monitor uses `puppeteer-extra-plugin-stealth` plus additional measures to avoid eBay blocking:
-
-- **User Agent Rotation** - Randomly selects from 6 different browser user agents each session
-- **Randomized Viewport** - Slight random variations in window size to avoid fingerprinting
-- **Navigator Overrides** - Spoofs webdriver, plugins, languages, platform, hardware concurrency
-- **Human-like Behavior:**
-  - Random delays between page loads (1-3 seconds)
-  - Random delays between searches (3-8 seconds)
-  - Simulated mouse movements
-  - Human-like scrolling with random scroll distances and timing
-- **Stealth Headers** - Sets sec-ch-ua, Sec-Fetch-* headers to match real Chrome
-
-## Crash Recovery & Stability
-The monitor has multiple layers of recovery to stay running 24/7:
-
-1. **Automatic Browser Restart** - Restarts Chromium every 2 hours to prevent memory leaks
-2. **Retry with Exponential Backoff** - Failed scrapes retry 3 times (10s, 20s, 40s delays)
-3. **Page Recovery** - Detects closed pages and recreates them
-4. **Safe Browser Close** - Timeout-protected browser.close() with force kill fallback
-5. **Hard Restart** - After 10 consecutive failures, exits process (Railway auto-restarts)
-6. **Chrome Force Kill** - Uses `pkill` to clean up zombie Chrome processes
-7. **Error Notifications** - Sends Discord alerts when errors occur
-
-Key functions for crash handling:
-- `safeBrowserClose()` - Graceful close with timeout
-- `forceKillChrome()` - Nuclear option to kill all Chrome processes
-- `hardRestart()` - Exits process for Railway to restart fresh
-
 ## Tips for Claude
 - The main file is `index.js` - read it first
-- Similar monitors share webhooks (e.g., all Webkinz use one webhook)
-- Use exact phrase matching with quotes in searchQuery for specific items
+- Use `requiredKeywordsAny` to consolidate similar searches
 - Always update `.env.example` when adding new webhook variables
 - Commit and push to deploy - Railway handles the rest
+- If CAPTCHA issues persist, recommend user adds a residential proxy

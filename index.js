@@ -10,12 +10,13 @@ puppeteer.use(StealthPlugin());
 
 // Global Configuration
 const CONFIG = {
-  checkIntervalMinutes: parseInt(process.env.CHECK_INTERVAL) || 10,
+  checkIntervalMinutes: parseInt(process.env.CHECK_INTERVAL) || 15, // Increased from 10 to reduce rate limiting
   browserRestartHours: parseFloat(process.env.BROWSER_RESTART_HOURS) || 2,
   maxRetries: parseInt(process.env.MAX_RETRIES) || 3,
   healthCheckHours: parseFloat(process.env.HEALTH_CHECK_HOURS) || 6,
-  hardRestartThreshold: parseInt(process.env.HARD_RESTART_THRESHOLD) || 10, // Force full restart after this many consecutive failures
-  browserCloseTimeout: 5000, // Max ms to wait for browser.close()
+  hardRestartThreshold: parseInt(process.env.HARD_RESTART_THRESHOLD) || 10,
+  browserCloseTimeout: 5000,
+  challengeCooldownMs: 5 * 60 * 1000, // 5 minute cooldown after CAPTCHA detection
 };
 
 // Rotating user agents to avoid detection
@@ -38,187 +39,100 @@ function randomDelay(min, max) {
   return new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * (max - min + 1)) + min));
 }
 
-// Multi-search configuration
+// Multi-search configuration - CONSOLIDATED for efficiency (10 searches instead of 24)
 // Each search has its own query, Discord webhook, and data file
+// requiredKeywords: ALL must match | requiredKeywordsAny: at least ONE must match
 const SEARCH_CONFIGS = [
+  // === SPONGEBOB TOPPS (consolidated from 6 to 2) ===
   {
-    name: 'Sketch',
-    searchQuery: 'Spongebob Topps Sketch',
-    webhookUrl: process.env.DISCORD_WEBHOOK_SKETCH,
-    dataFile: path.join(__dirname, 'seen_listings_sketch.json'),
-    requiredKeywords: ['spongebob', 'sketch']
+    name: 'Spongebob Topps Hits',
+    searchQuery: 'Spongebob Topps',
+    webhookUrl: process.env.DISCORD_WEBHOOK_SPONGEBOB || process.env.DISCORD_WEBHOOK_SKETCH,
+    dataFile: path.join(__dirname, 'seen_listings_spongebob_topps.json'),
+    requiredKeywords: ['spongebob', 'topps'],
+    // Catches: sketch, superfractor, 1/1, /5, /10, license, auto, plate
+    requiredKeywordsAny: ['sketch', 'superfractor', '1/1', '/5', '/10', 'license', 'auto', 'printing plate', 'one of one']
   },
   {
-    name: 'Superfractor',
-    searchQuery: 'Spongebob Topps "Superfractor"',
-    webhookUrl: process.env.DISCORD_WEBHOOK_SUPERFRACTOR,
-    dataFile: path.join(__dirname, 'seen_listings_superfractor.json'),
-    requiredKeywords: ['spongebob', 'superfractor']
+    name: 'Spongebob Topps Numbered',
+    searchQuery: 'Spongebob Topps numbered',
+    webhookUrl: process.env.DISCORD_WEBHOOK_SPONGEBOB || process.env.DISCORD_WEBHOOK_5,
+    dataFile: path.join(__dirname, 'seen_listings_spongebob_numbered.json'),
+    requiredKeywords: ['spongebob']
   },
-  {
-    name: '1/1',
-    searchQuery: 'Spongebob Topps 1/1',
-    webhookUrl: process.env.DISCORD_WEBHOOK_1OF1,
-    dataFile: path.join(__dirname, 'seen_listings_1of1.json'),
-    requiredKeywords: ['spongebob', '1/1']
-  },
-  {
-    name: '/5',
-    searchQuery: 'Spongebob Topps /5',
-    webhookUrl: process.env.DISCORD_WEBHOOK_5,
-    dataFile: path.join(__dirname, 'seen_listings_5.json'),
-    requiredKeywords: ['spongebob', '/5']
-  },
-  {
-    name: '/10 Black',
-    searchQuery: 'Spongebob Topps /10 black',
-    webhookUrl: process.env.DISCORD_WEBHOOK_5,
-    dataFile: path.join(__dirname, 'seen_listings_10_black.json'),
-    requiredKeywords: ['spongebob', '/10']
-  },
-  {
-    name: 'License',
-    searchQuery: 'Spongebob Topps License',
-    webhookUrl: process.env.DISCORD_WEBHOOK_5,
-    dataFile: path.join(__dirname, 'seen_listings_license.json'),
-    requiredKeywords: ['spongebob', 'license']
-  },
+
+  // === DRAGON BALL SUPER (keep as-is) ===
   {
     name: 'DBS God Rare',
     searchQuery: 'dragon ball super card "God Rare"',
     webhookUrl: process.env.DISCORD_WEBHOOK_DBS_GDR,
     dataFile: path.join(__dirname, 'seen_listings_dbs_gdr.json'),
-    requiredKeywords: ['dragon ball', 'god rare']
+    requiredKeywords: ['god rare']
   },
-  // Webkinz searches - exact match terms
-  // requiredKeywords ensures wrong search results don't get sent to wrong webhooks
+
+  // === WEBKINZ (consolidated from 9 to 2) ===
   {
-    name: 'Webkinz English Cream Retriever',
-    searchQuery: 'webkinz "english cream retriever"',
+    name: 'Webkinz Rare Plush',
+    searchQuery: 'webkinz plush rare',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_english_cream_retriever.json'),
-    requiredKeywords: ['webkinz']
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_rare.json'),
+    requiredKeywords: ['webkinz'],
+    // Filter for specific rare items
+    requiredKeywordsAny: [
+      'english cream retriever', 'salt pepper dalmatian', 'cinnamon beagle',
+      'corgi', 'red velvet fox', 'merry go round pony',
+      'love giraffe', 'lovely leopard', 'blue bay dolphin'
+    ]
   },
   {
-    name: 'Webkinz Salt Pepper Dalmatian',
-    searchQuery: 'webkinz "salt pepper dalmatian"',
+    name: 'Webkinz Retired',
+    searchQuery: 'webkinz retired plush',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_salt_pepper_dalmatian.json'),
-    requiredKeywords: ['webkinz']
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_retired.json'),
+    requiredKeywords: ['webkinz'],
+    requiredKeywordsAny: [
+      'english cream', 'dalmatian', 'beagle', 'corgi', 'velvet fox',
+      'merry go round', 'giraffe', 'leopard', 'dolphin'
+    ]
   },
+
+  // === LORCANA (consolidated from 6 to 3) ===
   {
-    name: 'Webkinz Cinnamon Beagle',
-    searchQuery: 'webkinz "cinnamon beagle"',
-    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_cinnamon_beagle.json'),
-    requiredKeywords: ['webkinz']
-  },
-  {
-    name: 'Webkinz Corgi Dog',
-    searchQuery: 'webkinz "corgi dog"',
-    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_corgi_dog.json'),
-    requiredKeywords: ['webkinz']
-  },
-  {
-    name: 'Webkinz Red Velvet Fox',
-    searchQuery: 'webkinz "red velvet fox"',
-    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_red_velvet_fox.json'),
-    requiredKeywords: ['webkinz']
-  },
-  {
-    name: 'Webkinz Merry Go Round Pony',
-    searchQuery: 'webkinz "merry go round pony"',
-    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_merry_go_round_pony.json'),
-    requiredKeywords: ['webkinz']
-  },
-  {
-    name: 'Webkinz Love Giraffe',
-    searchQuery: 'webkinz "love giraffe"',
-    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_love_giraffe.json'),
-    requiredKeywords: ['webkinz']
-  },
-  {
-    name: 'Webkinz Lovely Leopard',
-    searchQuery: 'webkinz "lovely leopard"',
-    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_lovely_leopard.json'),
-    requiredKeywords: ['webkinz']
-  },
-  {
-    name: 'Webkinz Blue Bay Dolphin',
-    searchQuery: 'webkinz "blue bay dolphin"',
-    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_blue_bay_dolphin.json'),
-    requiredKeywords: ['webkinz']
-  },
-  // Lorcana card searches - with category filter (2536 = Trading Card Games)
-  // requiredKeywords: all terms must appear in title (case-insensitive) or listing is filtered out
-  {
-    name: 'Lorcana Iconic Mickey',
-    searchQuery: 'Lorcana Iconic Mickey',
+    name: 'Lorcana Iconic',
+    searchQuery: 'Lorcana Iconic',
     webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
-    dataFile: path.join(__dirname, 'seen_listings_lorcana_iconic_mickey.json'),
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_iconic.json'),
     category: 2536,
-    requiredKeywords: ['iconic', 'mickey']
+    requiredKeywords: ['lorcana', 'iconic']
+    // Catches both Mickey and Minnie Iconic cards
   },
   {
-    name: 'Lorcana Iconic Minnie',
-    searchQuery: 'Lorcana Iconic Minnie',
+    name: 'Lorcana Enchanted Rare',
+    searchQuery: 'Lorcana Enchanted',
     webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
-    dataFile: path.join(__dirname, 'seen_listings_lorcana_iconic_minnie.json'),
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_enchanted.json'),
     category: 2536,
-    requiredKeywords: ['iconic', 'minnie']
+    requiredKeywords: ['lorcana', 'enchanted'],
+    requiredKeywordsAny: ['hunny', 'wizard', 'elsa', 'psa']
   },
   {
-    name: 'Lorcana Hunny Wizard Enchanted',
-    searchQuery: 'Lorcana Hunny Wizard Enchanted',
+    name: 'Lorcana Promo Serial',
+    searchQuery: 'Lorcana promo',
     webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
-    dataFile: path.join(__dirname, 'seen_listings_lorcana_hunny_wizard_enchanted.json'),
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_promo.json'),
     category: 2536,
-    requiredKeywords: ['hunny', 'wizard']
+    requiredKeywords: ['lorcana'],
+    requiredKeywordsAny: ['golden mickey', 'd23', 'serial', 'elsa promo']
   },
+
+  // === RIFTBOUND (consolidated from 2 to 1) ===
   {
-    name: 'Lorcana Elsa Enchanted PSA 10',
-    searchQuery: 'Lorcana Elsa Enchanted PSA 10',
-    webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
-    dataFile: path.join(__dirname, 'seen_listings_lorcana_elsa_enchanted_psa10.json'),
-    category: 2536,
-    requiredKeywords: ['elsa', 'enchanted']
-  },
-  {
-    name: 'Lorcana Golden Mickey Serial',
-    searchQuery: 'Lorcana Golden Mickey Serial',
-    webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
-    dataFile: path.join(__dirname, 'seen_listings_lorcana_golden_mickey_serial.json'),
-    category: 2536,
-    requiredKeywords: ['golden', 'mickey']
-  },
-  {
-    name: 'Lorcana D23 Elsa Promo',
-    searchQuery: 'Lorcana D23 Elsa Promo',
-    webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
-    dataFile: path.join(__dirname, 'seen_listings_lorcana_d23_elsa_promo.json'),
-    category: 2536,
-    requiredKeywords: ['d23', 'elsa']
-  },
-  // Riftbound searches
-  {
-    name: 'Riftbound Prize Wall',
-    searchQuery: 'Riftbound Prize Wall',
+    name: 'Riftbound Rare',
+    searchQuery: 'Riftbound',
     webhookUrl: process.env.DISCORD_WEBHOOK_RIFTBOUND,
-    dataFile: path.join(__dirname, 'seen_listings_riftbound_prize_wall.json'),
-    requiredKeywords: ['prize', 'wall']
-  },
-  {
-    name: 'Riftbound GGEZ Teemo',
-    searchQuery: 'Riftbound GGEZ Teemo',
-    webhookUrl: process.env.DISCORD_WEBHOOK_RIFTBOUND,
-    dataFile: path.join(__dirname, 'seen_listings_riftbound_ggez_teemo.json'),
-    requiredKeywords: ['ggez', 'teemo']
+    dataFile: path.join(__dirname, 'seen_listings_riftbound.json'),
+    requiredKeywords: ['riftbound'],
+    requiredKeywordsAny: ['prize wall', 'ggez', 'teemo', 'promo', 'worlds']
   }
 ];
 
@@ -230,6 +144,22 @@ let lastSuccessfulCheck = null;
 let totalChecks = 0;
 let totalNewListings = 0;
 let consecutiveFailures = 0;
+let isCheckRunning = false; // Prevents overlapping check cycles
+let challengeDetectedAt = null; // Tracks when eBay CAPTCHA was last seen
+
+// Proxy rotation support
+const PROXY_POOL = (process.env.PROXY_POOL || '').split(',').filter(p => p.trim());
+let currentProxyIndex = 0;
+
+function getNextProxy() {
+  // Single proxy takes precedence
+  if (process.env.PROXY_URL) return process.env.PROXY_URL;
+  // Otherwise rotate through pool
+  if (PROXY_POOL.length === 0) return null;
+  const proxy = PROXY_POOL[currentProxyIndex];
+  currentProxyIndex = (currentProxyIndex + 1) % PROXY_POOL.length;
+  return proxy.trim();
+}
 
 // State per search
 const searchStates = new Map();
@@ -245,7 +175,7 @@ function buildEbayUrl(query, category = null) {
   return url;
 }
 
-// Check if listing passes required keywords filter
+// Check if listing passes required keywords filter (ALL must match)
 // Returns true if listing should be included, false if filtered out
 function passesKeywordFilter(listing, requiredKeywords) {
   if (!requiredKeywords || requiredKeywords.length === 0) {
@@ -258,6 +188,21 @@ function passesKeywordFilter(listing, requiredKeywords) {
     }
   }
   return true;
+}
+
+// Check if listing passes ANY keyword filter (at least ONE must match)
+// Returns true if listing contains ANY of the keywords
+function passesAnyKeywordFilter(listing, anyKeywords) {
+  if (!anyKeywords || anyKeywords.length === 0) {
+    return true; // No filter configured
+  }
+  const titleLower = (listing.title || '').toLowerCase();
+  for (const keyword of anyKeywords) {
+    if (titleLower.includes(keyword.toLowerCase())) {
+      return true; // Found at least one match
+    }
+  }
+  return false; // None of the keywords found
 }
 
 // Load seen listings from file
@@ -580,38 +525,66 @@ async function launchBrowser() {
   const userAgent = getRandomUserAgent();
   console.log(`[INFO] Using user agent: ${userAgent.substring(0, 50)}...`);
 
+  // Build browser args
+  const browserArgs = [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-accelerated-2d-canvas',
+    '--no-first-run',
+    '--no-zygote',
+    '--disable-gpu',
+    '--disable-blink-features=AutomationControlled',
+    '--disable-web-security',
+    '--disable-features=IsolateOrigins,site-per-process',
+    // Crash reporter fixes - prevents EAGAIN errors
+    '--disable-crash-reporter',
+    '--disable-breakpad',
+    '--disable-component-update',
+    // Additional stealth
+    '--disable-infobars',
+    '--window-size=1920,1080',
+    '--disable-background-timer-throttling',
+    '--disable-backgrounding-occluded-windows',
+    '--disable-renderer-backgrounding',
+    // Memory management
+    '--single-process',
+    '--memory-pressure-off',
+    '--max_old_space_size=512'
+  ];
+
+  // Add proxy support if configured
+  const proxy = getNextProxy();
+  if (proxy) {
+    // Extract proxy URL without credentials for the browser arg
+    const proxyUrl = proxy.includes('@') ? proxy.split('@')[1] : proxy;
+    browserArgs.push(`--proxy-server=${proxyUrl}`);
+    console.log(`[INFO] Using proxy: ${proxyUrl.substring(0, 30)}...`);
+  }
+
   browser = await puppeteer.launch({
     headless: 'new',
     protocolTimeout: 240000, // 4 minutes - prevents timeout errors on slow containers
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--disable-gpu',
-      '--disable-blink-features=AutomationControlled',
-      '--disable-web-security',
-      '--disable-features=IsolateOrigins,site-per-process',
-      // Crash reporter fixes - prevents EAGAIN errors
-      '--disable-crash-reporter',
-      '--disable-breakpad',
-      '--disable-component-update',
-      // Additional stealth
-      '--disable-infobars',
-      '--window-size=1920,1080',
-      '--disable-background-timer-throttling',
-      '--disable-backgrounding-occluded-windows',
-      '--disable-renderer-backgrounding',
-      // Memory management
-      '--single-process',
-      '--memory-pressure-off',
-      '--max_old_space_size=512'
-    ]
+    args: browserArgs
   });
 
   page = await browser.newPage();
+
+  // Handle proxy authentication if credentials provided
+  if (proxy && proxy.includes('@')) {
+    try {
+      const authMatch = proxy.match(/\/\/([^:]+):([^@]+)@/);
+      if (authMatch) {
+        await page.authenticate({
+          username: authMatch[1],
+          password: authMatch[2]
+        });
+        console.log('[INFO] Proxy authentication configured');
+      }
+    } catch (e) {
+      console.log(`[WARN] Proxy auth setup failed: ${e.message}`);
+    }
+  }
 
   // Randomize viewport slightly to avoid fingerprinting
   const viewportWidth = 1920 + Math.floor(Math.random() * 100) - 50;
@@ -700,6 +673,13 @@ async function scrapeListings(searchConfig, retryCount = 0) {
     await hardRestart(`Consecutive failures reached ${consecutiveFailures}`);
   }
 
+  // Check if we're in CAPTCHA cooldown - skip scraping to let eBay cool down
+  if (challengeDetectedAt && (Date.now() - challengeDetectedAt) < CONFIG.challengeCooldownMs) {
+    const remainingCooldown = Math.ceil((CONFIG.challengeCooldownMs - (Date.now() - challengeDetectedAt)) / 1000);
+    console.log(`[WARN] CAPTCHA cooldown active (${remainingCooldown}s remaining) - skipping "${searchConfig.name}"`);
+    return [];
+  }
+
   try {
     // Check if browser needs restart
     if (shouldRestartBrowser()) {
@@ -734,6 +714,11 @@ async function scrapeListings(searchConfig, retryCount = 0) {
     const currentUrlLower = currentUrl.toLowerCase();
 
     if (!currentUrlLower.includes('ebay.com') || !currentUrlLower.includes('_nkw=')) {
+      // Detect CAPTCHA/challenge page specifically and enter cooldown
+      if (currentUrlLower.includes('splashui/challenge') || currentUrlLower.includes('captcha')) {
+        challengeDetectedAt = Date.now();
+        console.log('[WARN] CAPTCHA/Challenge detected - entering 5 minute cooldown');
+      }
       throw new Error(`Navigation failed - landed on unexpected page: ${currentUrl.substring(0, 100)}`);
     }
 
@@ -927,10 +912,17 @@ async function checkSearch(searchConfig) {
         if (state.isFirstRun) {
           console.log(`[INIT] [${searchConfig.name}] ${listing.title?.substring(0, 50)}...`);
         } else {
-          // Check if listing passes keyword filter (if configured)
+          // Check if listing passes ALL required keywords filter
           if (!passesKeywordFilter(listing, searchConfig.requiredKeywords)) {
             console.log(`[FILTERED] [${searchConfig.name}] ${listing.title?.substring(0, 60)}...`);
             console.log(`           Missing required keywords: ${searchConfig.requiredKeywords.join(', ')}`);
+            continue; // Skip this listing, don't notify
+          }
+
+          // Check if listing passes ANY keyword filter (if configured)
+          if (searchConfig.requiredKeywordsAny && !passesAnyKeywordFilter(listing, searchConfig.requiredKeywordsAny)) {
+            console.log(`[FILTERED] [${searchConfig.name}] ${listing.title?.substring(0, 60)}...`);
+            console.log(`           Missing any of: ${searchConfig.requiredKeywordsAny.slice(0, 5).join(', ')}...`);
             continue; // Skip this listing, don't notify
           }
 
@@ -979,23 +971,49 @@ async function checkSearch(searchConfig) {
 
 // Check all searches
 async function checkAllSearches() {
+  // Prevent overlapping check cycles - critical for stability
+  if (isCheckRunning) {
+    console.log('[WARN] Previous check cycle still running - skipping this interval');
+    return 0;
+  }
+
+  isCheckRunning = true;
   const timestamp = new Date().toLocaleString();
   console.log(`\n[${timestamp}] Running check #${totalChecks + 1} for all ${SEARCH_CONFIGS.length} searches...`);
 
   let totalNew = 0;
 
-  for (const searchConfig of SEARCH_CONFIGS) {
-    const newCount = await checkSearch(searchConfig);
-    totalNew += newCount;
+  try {
+    for (const searchConfig of SEARCH_CONFIGS) {
+      // Skip remaining searches if CAPTCHA cooldown is active
+      if (challengeDetectedAt && (Date.now() - challengeDetectedAt) < CONFIG.challengeCooldownMs) {
+        const remainingCooldown = Math.ceil((CONFIG.challengeCooldownMs - (Date.now() - challengeDetectedAt)) / 1000);
+        console.log(`[WARN] CAPTCHA cooldown active (${remainingCooldown}s) - pausing remaining searches`);
+        break;
+      }
 
-    // Random delay between searches (5-12 seconds) to appear more human-like
-    await randomDelay(5000, 12000);
+      const newCount = await checkSearch(searchConfig);
+      totalNew += newCount;
+
+      // Increased delay between searches (10-25 seconds) to reduce rate limiting
+      await randomDelay(10000, 25000);
+    }
+
+    totalChecks++;
+    lastSuccessfulCheck = Date.now();
+
+    // Clear CAPTCHA cooldown if we completed a full cycle without issues
+    if (consecutiveFailures === 0) {
+      challengeDetectedAt = null;
+    }
+
+    console.log(`[INFO] All searches completed. Total new listings: ${totalNew}`);
+  } catch (error) {
+    console.error(`[ERROR] Check cycle failed: ${error.message}`);
+  } finally {
+    isCheckRunning = false;
   }
 
-  totalChecks++;
-  lastSuccessfulCheck = Date.now();
-
-  console.log(`[INFO] All searches completed. Total new listings: ${totalNew}`);
   return totalNew;
 }
 
@@ -1041,14 +1059,18 @@ async function main() {
   // Run initial check
   await checkAllSearches();
 
-  // Schedule periodic checks
+  // Schedule periodic checks using setTimeout (prevents overlapping cycles)
   const checkIntervalMs = CONFIG.checkIntervalMinutes * 60 * 1000;
   console.log(`\n[INFO] Next check in ${CONFIG.checkIntervalMinutes} minutes...`);
 
-  setInterval(async () => {
-    await checkAllSearches();
-    console.log(`[INFO] Next check in ${CONFIG.checkIntervalMinutes} minutes...`);
-  }, checkIntervalMs);
+  const scheduleNextCheck = () => {
+    setTimeout(async () => {
+      await checkAllSearches();
+      console.log(`[INFO] Next check in ${CONFIG.checkIntervalMinutes} minutes...`);
+      scheduleNextCheck(); // Only schedule next after current completes
+    }, checkIntervalMs);
+  };
+  scheduleNextCheck();
 
   // Schedule health check notifications
   const healthCheckMs = CONFIG.healthCheckHours * 60 * 60 * 1000;
