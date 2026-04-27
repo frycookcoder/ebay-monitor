@@ -136,24 +136,24 @@ const SEARCH_CONFIGS = [
   },
   {
     name: 'Webkinz Narwhal',
-    searchQuery: 'webkinz narwhal',
+    searchQuery: 'webkinz "narwhal"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
     dataFile: path.join(__dirname, 'seen_listings_webkinz_narwhal.json'),
-    requiredKeywords: ['webkinz']
+    requiredKeywords: ['webkinz', 'narwhal']
   },
   {
     name: 'Webkinz Pitbull',
-    searchQuery: 'webkinz pitbull',
+    searchQuery: 'webkinz "pitbull"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
     dataFile: path.join(__dirname, 'seen_listings_webkinz_pitbull.json'),
-    requiredKeywords: ['webkinz']
+    requiredKeywords: ['webkinz', 'pitbull']
   },
   {
     name: 'Webkinz 10 Year Magic W Pup',
     searchQuery: 'webkinz "10 year magic W pup"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
     dataFile: path.join(__dirname, 'seen_listings_webkinz_10_year_magic_w_pup.json'),
-    requiredKeywords: ['webkinz']
+    requiredKeywords: ['webkinz', 'magic', 'pup']
   },
   // Lorcana card searches - with category filter (2536 = Trading Card Games)
   {
