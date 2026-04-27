@@ -27,33 +27,30 @@ Each monitor has:
 - `webhookUrl` - Discord webhook (from env var)
 - `dataFile` - JSON file to track seen listings
 - `requiredKeywords` - ALL keywords must match (array)
-- `requiredKeywordsAny` - At least ONE keyword must match (array, optional)
 - `category` - eBay category ID (optional, e.g., 2536 for Trading Card Games)
 
-## Current Monitors (10 total - Consolidated from 24)
+## Current Monitors (24 total)
 
-### Spongebob Topps (2 searches)
-- **Spongebob Topps Hits** - Catches sketch, superfractor, 1/1, /5, /10, license, auto, plate
-- **Spongebob Topps Numbered** - General numbered cards
-- Webhook: `DISCORD_WEBHOOK_SPONGEBOB`
+### Spongebob Cards (6)
+- Sketch, Superfractor, 1/1, /5, /10 Black, License
+- Webhooks: `DISCORD_WEBHOOK_SKETCH`, `_SUPERFRACTOR`, `_1OF1`, `_5`
 
-### Dragon Ball Super (1 search)
-- **DBS God Rare** - God Rare cards
+### Dragon Ball Super (1)
+- God Rare cards
 - Webhook: `DISCORD_WEBHOOK_DBS_GDR`
 
-### Webkinz (2 searches)
-- **Webkinz Rare Plush** - Specific rare plush items
-- **Webkinz Retired** - Retired plush items
-- Webhook: `DISCORD_WEBHOOK_WEBKINZ`
+### Webkinz (9)
+- English Cream Retriever, Salt Pepper Dalmatian, Cinnamon Beagle, Corgi Dog
+- Red Velvet Fox, Merry Go Round Pony, Love Giraffe, Lovely Leopard, Blue Bay Dolphin
+- Webhook: `DISCORD_WEBHOOK_WEBKINZ` (shared)
 
-### Lorcana (3 searches)
-- **Lorcana Iconic** - Mickey and Minnie Iconic cards
-- **Lorcana Enchanted Rare** - Hunny Wizard, Elsa Enchanted, PSA graded
-- **Lorcana Promo Serial** - Golden Mickey, D23 promos, serial numbered
-- Webhook: `DISCORD_WEBHOOK_LORCANA`
+### Lorcana Cards (6)
+- Iconic Mickey, Iconic Minnie, Hunny Wizard Enchanted
+- Elsa Enchanted PSA 10, Golden Mickey Serial, D23 Elsa Promo
+- Webhook: `DISCORD_WEBHOOK_LORCANA` (shared)
 
-### Riftbound (1 search)
-- **Riftbound Rare** - Prize Wall, GGEZ Teemo, promos
+### Riftbound (2)
+- Prize Wall, GGEZ Teemo
 - Webhook: `DISCORD_WEBHOOK_RIFTBOUND`
 
 ## Configuration (via env vars)
@@ -107,8 +104,7 @@ Recommended services: Smartproxy, Bright Data, IPRoyal (residential IPs)
   searchQuery: 'your search terms here',
   webhookUrl: process.env.DISCORD_WEBHOOK_YOURNAME,
   dataFile: path.join(__dirname, 'seen_listings_your_name.json'),
-  requiredKeywords: ['must', 'match', 'all'],
-  requiredKeywordsAny: ['match', 'any', 'of', 'these'] // optional
+  requiredKeywords: ['must', 'match', 'all']
 }
 ```
 
@@ -129,7 +125,8 @@ Add `DISCORD_WEBHOOK_YOURNAME` in Railway dashboard under Variables.
 
 ## Tips for Claude
 - The main file is `index.js` - read it first
-- Use `requiredKeywordsAny` to consolidate similar searches
+- Similar monitors share webhooks (e.g., all Webkinz use one webhook)
+- Use exact phrase matching with quotes in searchQuery for specific items
 - Always update `.env.example` when adding new webhook variables
 - Commit and push to deploy - Railway handles the rest
 - If CAPTCHA issues persist, recommend user adds a residential proxy

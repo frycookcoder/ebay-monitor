@@ -39,100 +39,193 @@ function randomDelay(min, max) {
   return new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * (max - min + 1)) + min));
 }
 
-// Multi-search configuration - CONSOLIDATED for efficiency (10 searches instead of 24)
+// Multi-search configuration
 // Each search has its own query, Discord webhook, and data file
-// requiredKeywords: ALL must match | requiredKeywordsAny: at least ONE must match
 const SEARCH_CONFIGS = [
-  // === SPONGEBOB TOPPS (consolidated from 6 to 2) ===
   {
-    name: 'Spongebob Topps Hits',
-    searchQuery: 'Spongebob Topps',
-    webhookUrl: process.env.DISCORD_WEBHOOK_SPONGEBOB || process.env.DISCORD_WEBHOOK_SKETCH,
-    dataFile: path.join(__dirname, 'seen_listings_spongebob_topps.json'),
-    requiredKeywords: ['spongebob', 'topps'],
-    // Catches: sketch, superfractor, 1/1, /5, /10, license, auto, plate
-    requiredKeywordsAny: ['sketch', 'superfractor', '1/1', '/5', '/10', 'license', 'auto', 'printing plate', 'one of one']
+    name: 'Sketch',
+    searchQuery: 'Spongebob Topps Sketch',
+    webhookUrl: process.env.DISCORD_WEBHOOK_SKETCH,
+    dataFile: path.join(__dirname, 'seen_listings_sketch.json'),
+    requiredKeywords: ['spongebob', 'sketch']
   },
   {
-    name: 'Spongebob Topps Numbered',
-    searchQuery: 'Spongebob Topps numbered',
-    webhookUrl: process.env.DISCORD_WEBHOOK_SPONGEBOB || process.env.DISCORD_WEBHOOK_5,
-    dataFile: path.join(__dirname, 'seen_listings_spongebob_numbered.json'),
-    requiredKeywords: ['spongebob']
+    name: 'Superfractor',
+    searchQuery: 'Spongebob Topps "Superfractor"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_SUPERFRACTOR,
+    dataFile: path.join(__dirname, 'seen_listings_superfractor.json'),
+    requiredKeywords: ['spongebob', 'superfractor']
   },
-
-  // === DRAGON BALL SUPER (keep as-is) ===
+  {
+    name: '1/1',
+    searchQuery: 'Spongebob Topps 1/1',
+    webhookUrl: process.env.DISCORD_WEBHOOK_1OF1,
+    dataFile: path.join(__dirname, 'seen_listings_1of1.json'),
+    requiredKeywords: ['spongebob', '1/1']
+  },
+  {
+    name: '/5',
+    searchQuery: 'Spongebob Topps /5',
+    webhookUrl: process.env.DISCORD_WEBHOOK_5,
+    dataFile: path.join(__dirname, 'seen_listings_5.json'),
+    requiredKeywords: ['spongebob', '/5']
+  },
+  {
+    name: '/10 Black',
+    searchQuery: 'Spongebob Topps /10 black',
+    webhookUrl: process.env.DISCORD_WEBHOOK_5,
+    dataFile: path.join(__dirname, 'seen_listings_10_black.json'),
+    requiredKeywords: ['spongebob', '/10']
+  },
+  {
+    name: 'License',
+    searchQuery: 'Spongebob Topps License',
+    webhookUrl: process.env.DISCORD_WEBHOOK_5,
+    dataFile: path.join(__dirname, 'seen_listings_license.json'),
+    requiredKeywords: ['spongebob', 'license']
+  },
   {
     name: 'DBS God Rare',
     searchQuery: 'dragon ball super card "God Rare"',
     webhookUrl: process.env.DISCORD_WEBHOOK_DBS_GDR,
     dataFile: path.join(__dirname, 'seen_listings_dbs_gdr.json'),
-    requiredKeywords: ['god rare']
+    requiredKeywords: ['dragon ball', 'god rare']
   },
-
-  // === WEBKINZ (consolidated from 9 to 2) ===
+  // Webkinz searches - exact match terms
   {
-    name: 'Webkinz Rare Plush',
-    searchQuery: 'webkinz plush rare',
+    name: 'Webkinz English Cream Retriever',
+    searchQuery: 'webkinz "english cream retriever"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_rare.json'),
-    requiredKeywords: ['webkinz'],
-    // Filter for specific rare items
-    requiredKeywordsAny: [
-      'english cream retriever', 'salt pepper dalmatian', 'cinnamon beagle',
-      'corgi', 'red velvet fox', 'merry go round pony',
-      'love giraffe', 'lovely leopard', 'blue bay dolphin'
-    ]
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_english_cream_retriever.json'),
+    requiredKeywords: ['webkinz']
   },
   {
-    name: 'Webkinz Retired',
-    searchQuery: 'webkinz retired plush',
+    name: 'Webkinz Red Velvet Fox',
+    searchQuery: 'webkinz "red velvet fox"',
     webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
-    dataFile: path.join(__dirname, 'seen_listings_webkinz_retired.json'),
-    requiredKeywords: ['webkinz'],
-    requiredKeywordsAny: [
-      'english cream', 'dalmatian', 'beagle', 'corgi', 'velvet fox',
-      'merry go round', 'giraffe', 'leopard', 'dolphin'
-    ]
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_red_velvet_fox.json'),
+    requiredKeywords: ['webkinz']
   },
-
-  // === LORCANA (consolidated from 6 to 3) ===
   {
-    name: 'Lorcana Iconic',
-    searchQuery: 'Lorcana Iconic',
+    name: 'Webkinz Merry Go Round Pony',
+    searchQuery: 'webkinz "merry go round pony"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_merry_go_round_pony.json'),
+    requiredKeywords: ['webkinz']
+  },
+  {
+    name: 'Webkinz Love Giraffe',
+    searchQuery: 'webkinz "love giraffe"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_love_giraffe.json'),
+    requiredKeywords: ['webkinz']
+  },
+  {
+    name: 'Webkinz Lovely Leopard',
+    searchQuery: 'webkinz "lovely leopard"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_lovely_leopard.json'),
+    requiredKeywords: ['webkinz']
+  },
+  {
+    name: 'Webkinz Blue Bay Dolphin',
+    searchQuery: 'webkinz "blue bay dolphin"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_blue_bay_dolphin.json'),
+    requiredKeywords: ['webkinz']
+  },
+  {
+    name: 'Webkinz Narwhal',
+    searchQuery: 'webkinz narwhal',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_narwhal.json'),
+    requiredKeywords: ['webkinz']
+  },
+  {
+    name: 'Webkinz Pitbull',
+    searchQuery: 'webkinz pitbull',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_pitbull.json'),
+    requiredKeywords: ['webkinz']
+  },
+  {
+    name: 'Webkinz 10 Year Magic W Pup',
+    searchQuery: 'webkinz "10 year magic W pup"',
+    webhookUrl: process.env.DISCORD_WEBHOOK_WEBKINZ,
+    dataFile: path.join(__dirname, 'seen_listings_webkinz_10_year_magic_w_pup.json'),
+    requiredKeywords: ['webkinz']
+  },
+  // Lorcana card searches - with category filter (2536 = Trading Card Games)
+  {
+    name: 'Lorcana Iconic Mickey',
+    searchQuery: 'Lorcana Iconic Mickey',
     webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
-    dataFile: path.join(__dirname, 'seen_listings_lorcana_iconic.json'),
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_iconic_mickey.json'),
     category: 2536,
-    requiredKeywords: ['lorcana', 'iconic']
-    // Catches both Mickey and Minnie Iconic cards
+    requiredKeywords: ['iconic', 'mickey']
   },
   {
-    name: 'Lorcana Enchanted Rare',
-    searchQuery: 'Lorcana Enchanted',
+    name: 'Lorcana Iconic Minnie',
+    searchQuery: 'Lorcana Iconic Minnie',
     webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
-    dataFile: path.join(__dirname, 'seen_listings_lorcana_enchanted.json'),
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_iconic_minnie.json'),
     category: 2536,
-    requiredKeywords: ['lorcana', 'enchanted'],
-    requiredKeywordsAny: ['hunny', 'wizard', 'elsa', 'psa']
+    requiredKeywords: ['iconic', 'minnie']
   },
   {
-    name: 'Lorcana Promo Serial',
-    searchQuery: 'Lorcana promo',
+    name: 'Lorcana Hunny Wizard Enchanted',
+    searchQuery: 'Lorcana Hunny Wizard Enchanted',
     webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
-    dataFile: path.join(__dirname, 'seen_listings_lorcana_promo.json'),
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_hunny_wizard_enchanted.json'),
     category: 2536,
-    requiredKeywords: ['lorcana'],
-    requiredKeywordsAny: ['golden mickey', 'd23', 'serial', 'elsa promo']
+    requiredKeywords: ['hunny', 'wizard']
   },
-
-  // === RIFTBOUND (consolidated from 2 to 1) ===
   {
-    name: 'Riftbound Rare',
-    searchQuery: 'Riftbound',
+    name: 'Lorcana Elsa Enchanted PSA 10',
+    searchQuery: 'Lorcana Elsa Enchanted PSA 10',
+    webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_elsa_enchanted_psa10.json'),
+    category: 2536,
+    requiredKeywords: ['elsa', 'enchanted']
+  },
+  {
+    name: 'Lorcana Golden Mickey Serial',
+    searchQuery: 'Lorcana Golden Mickey Serial',
+    webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_golden_mickey_serial.json'),
+    category: 2536,
+    requiredKeywords: ['golden', 'mickey']
+  },
+  {
+    name: 'Lorcana D23 Elsa Promo',
+    searchQuery: 'Lorcana D23 Elsa Promo',
+    webhookUrl: process.env.DISCORD_WEBHOOK_LORCANA,
+    dataFile: path.join(__dirname, 'seen_listings_lorcana_d23_elsa_promo.json'),
+    category: 2536,
+    requiredKeywords: ['d23', 'elsa']
+  },
+  // Riftbound searches
+  {
+    name: 'Riftbound Prize Wall',
+    searchQuery: 'Riftbound Prize Wall',
     webhookUrl: process.env.DISCORD_WEBHOOK_RIFTBOUND,
-    dataFile: path.join(__dirname, 'seen_listings_riftbound.json'),
-    requiredKeywords: ['riftbound'],
-    requiredKeywordsAny: ['prize wall', 'ggez', 'teemo', 'promo', 'worlds']
+    dataFile: path.join(__dirname, 'seen_listings_riftbound_prize_wall.json'),
+    requiredKeywords: ['prize', 'wall']
+  },
+  {
+    name: 'Riftbound GGEZ Teemo',
+    searchQuery: 'Riftbound GGEZ Teemo',
+    webhookUrl: process.env.DISCORD_WEBHOOK_RIFTBOUND,
+    dataFile: path.join(__dirname, 'seen_listings_riftbound_ggez_teemo.json'),
+    requiredKeywords: ['ggez', 'teemo']
+  },
+  // TMNT searches
+  {
+    name: 'TMNT Magic Gold Borderless Signature',
+    searchQuery: 'tmnt magic gold borderless signature card',
+    webhookUrl: process.env.DISCORD_WEBHOOK_TMNT,
+    dataFile: path.join(__dirname, 'seen_listings_tmnt_magic_gold_borderless.json'),
+    requiredKeywords: ['tmnt', 'signature']
   }
 ];
 
